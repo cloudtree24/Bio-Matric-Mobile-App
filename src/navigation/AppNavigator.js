@@ -1,0 +1,29 @@
+import React from 'react';
+import {NavigationContainer} from '@react-navigation/native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+
+import {ROUTES} from '../constants/routes';
+import AdminDashboardScreen from '../screens/Admin/AdminDashboardScreen';
+import RegisterScreen from '../screens/Register/RegisterScreen';
+import SplashScreen from '../screens/Splash/SplashScreen';
+import UserSubmitScreen from '../screens/UserSubmit/UserSubmitScreen';
+
+const Stack = createNativeStackNavigator();
+
+const AppNavigator = () => (
+  <NavigationContainer>
+    <Stack.Navigator
+      initialRouteName={ROUTES.SPLASH}
+      screenOptions={{headerShown: false}}>
+      <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
+      <Stack.Screen name={ROUTES.USER_SUBMIT} component={UserSubmitScreen} />
+      <Stack.Screen name={ROUTES.REGISTER} component={RegisterScreen} />
+      <Stack.Screen
+        name={ROUTES.ADMIN_DASHBOARD}
+        component={AdminDashboardScreen}
+      />
+    </Stack.Navigator>
+  </NavigationContainer>
+);
+
+export default AppNavigator;
