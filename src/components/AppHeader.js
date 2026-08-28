@@ -1,29 +1,89 @@
-import React from 'react';
-import {Image, StyleSheet, Text, View} from 'react-native';
+import React, {useState} from 'react';
+import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {COLORS} from '../constants/colors';
+import {useNavigation} from '@react-navigation/native';
 
-const AppHeader = ({showNavigation = false}) => (
-  <View style={styles.header}>
-    {showNavigation ? (
-      <Icon name="menu-outline" size={34} color={COLORS.darkGreen} style={styles.leftIcon} />
-    ) : (
-      <View style={styles.sideSpace} />
-    )}
-    <Image
-      accessibilityLabel="The Cloud Tree AI"
-      resizeMode="contain"
-      source={require('../assets/verticallogo.png')}
-      style={styles.logo}
-    />
-    <Icon
-      name="ellipsis-vertical"
-      size={20}
-      color="#000000"
-      style={styles.menuIcon}
-    />
-  </View>
-);
+import {COLORS} from '../constants/colors';
+import {ROUTES} from '../constants/routes';
+
+const AppHeader = () => {
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const navigation = useNavigation();
+
+  const goTo = route => {
+    setIsMenuVisible(false);
+    navigation.navigate(route);
+  };
+
+  return (
+    <View style={styles.headerContainer}>
+      <View style={styles.header}>
+        <View style={styles.sideSpace} />
+        <Image
+          accessibilityLabel="The Cloud Tree AI"
+          resizeMode="contain"
+          source={require('../assets/verticallogo.png')}
+          style={styles.logo}
+        />
+        <Pressable
+          accessibilityLabel="Open menu"
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={() => setIsMenuVisible(visible => !visible)}>
+          <Icon
+            name="ellipsis-vertical"
+            size={20}
+            color="#000000"
+            style={styles.menuIcon}
+          />
+        </Pressable>
+      </View>
+      <Modal
+        animationType="none"
+        onRequestClose={() => setIsMenuVisible(false)}
+        statusBarTranslucent
+        transparent
+        visible={isMenuVisible}>
+        <View style={styles.modalRoot}>
+          <Pressable
+            accessibilityLabel="Close menu"
+            accessibilityRole="button"
+            onPress={() => setIsMenuVisible(false)}
+            style={styles.backdrop}
+          />
+          <View accessibilityViewIsModal style={styles.menu}>
+            <Text style={styles.menuTitle}>Quick menu</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => goTo(ROUTES.ADMIN_LOGIN)}
+              style={({pressed}) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+              <View style={styles.menuIconWrap}>
+                <Icon color={COLORS.darkGreen} name="shield-checkmark-outline" size={21} />
+              </View>
+              <View>
+                <Text style={styles.menuButtonText}>Admin</Text>
+                <Text style={styles.menuButtonHint}>Sign in to the dashboard</Text>
+              </View>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => goTo(ROUTES.REGISTER)}
+              style={({pressed}) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
+              <View style={styles.menuIconWrap}>
+                <Icon color={COLORS.darkGreen} name="person-add-outline" size={21} />
+              </View>
+              <View>
+                <Text style={styles.menuButtonText}>Register</Text>
+                <Text style={styles.menuButtonHint}>Submit your registration</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   header: {
@@ -37,10 +97,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 18,
   },
-  sideSpace: {
-    width: 26,
+  headerContainer: {
+    zIndex: 10,
   },
-  leftIcon: {
+  sideSpace: {
     width: 26,
   },
   logo: {
@@ -55,6 +115,75 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     textAlign: 'center',
     width: 26,
+  },
+  menu: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#D8E9DC',
+    elevation: 12,
+    padding: 10,
+    position: 'absolute',
+    right: 16,
+    shadowColor: '#000000',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    top: 76,
+    width: 245,
+  },
+  modalRoot: {
+    flex: 1,
+  },
+  backdrop: {
+    // backgroundColor: 'rgba(16, 44, 23, 0.16)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  menuTitle: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    textTransform: 'uppercase',
+  },
+  menuButton: {
+    alignItems: 'center',
+    borderRadius: 10,
+    flexDirection: 'row',
+    padding: 10,
+  },
+  menuButtonPressed: {
+    backgroundColor: '#EAF8ED',
+  },
+  menuButtonText: {
+    color: COLORS.darkGreen,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  menuButtonHint: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  menuIconWrap: {
+    alignItems: 'center',
+    backgroundColor: '#EAF8ED',
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 40,
+  },
+  menuDivider: {
+    backgroundColor: '#E5E7EB',
+    height: 1,
+    marginHorizontal: 8,
   },
 });
 

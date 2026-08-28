@@ -5,7 +5,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import SplashScreen from '../src/screens/Splash/SplashScreen';
-import UserSubmitScreen from '../src/screens/UserSubmit/UserSubmitScreen';
+import UserSubmitScreen from '../src/screens/LoginScreen/LoginScreen';
 
 test('opens User Submit after the splash delay', async () => {
   jest.useFakeTimers();

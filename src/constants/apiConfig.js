@@ -10,7 +10,7 @@
 
 // Anshuman Local
 // const BASE_URL = 'http://192.168.29.3:91/api';
-// const BASE_URL = 'http://192.168.29.254:91/api';
+const BASE_URL = 'http://192.168.29.254:91/api';
 
 // Datari Local
 // const BASE_URL = 'http://192.168.29.71/api';
@@ -22,7 +22,7 @@
  * UAT / Staging Server
  * ------------------------------------------------------------------ */
 
-const BASE_URL = 'https://hcmapiv2.anantatek.com/api';
+// const BASE_URL = 'https://hcmapiv2.anantatek.com/api';
 
 /* ------------------------------------------------------------------
  * Production (Live) Server

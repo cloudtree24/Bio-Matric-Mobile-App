@@ -4,9 +4,10 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 
 import {ROUTES} from '../constants/routes';
 import AdminDashboardScreen from '../screens/Admin/AdminDashboardScreen';
+import AdminLoginScreen from '../screens/Admin/AdminLoginScreen';
 import RegisterScreen from '../screens/Register/RegisterScreen';
 import SplashScreen from '../screens/Splash/SplashScreen';
-import UserSubmitScreen from '../screens/UserSubmit/UserSubmitScreen';
+import LoginScreen from '../screens/LoginScreen/LoginScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -16,8 +17,9 @@ const AppNavigator = () => (
       initialRouteName={ROUTES.SPLASH}
       screenOptions={{headerShown: false}}>
       <Stack.Screen name={ROUTES.SPLASH} component={SplashScreen} />
-      <Stack.Screen name={ROUTES.USER_SUBMIT} component={UserSubmitScreen} />
+      <Stack.Screen name={ROUTES.LOGIN} component={LoginScreen} />
       <Stack.Screen name={ROUTES.REGISTER} component={RegisterScreen} />
+      <Stack.Screen name={ROUTES.ADMIN_LOGIN} component={AdminLoginScreen} />
       <Stack.Screen
         name={ROUTES.ADMIN_DASHBOARD}
         component={AdminDashboardScreen}

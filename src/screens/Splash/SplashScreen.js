@@ -9,7 +9,7 @@ const SPLASH_DURATION_MS = 1500;
 const SplashScreen = ({navigation}) => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      navigation.replace(ROUTES.USER_SUBMIT);
+      navigation.replace(ROUTES.LOGIN);
     }, SPLASH_DURATION_MS);
 
     return () => clearTimeout(timeoutId);

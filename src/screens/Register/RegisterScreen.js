@@ -25,12 +25,9 @@ const RegisterOption = ({image, label, onPress}) => (
   </Pressable>
 );
 
-
-
-
 const RegisterScreen = () => (
   <SafeAreaView style={styles.safeArea}>
-    <AppHeader />
+    <AppHeader showNavigation />
     <ScrollView
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
@@ -43,13 +40,13 @@ const RegisterScreen = () => (
       <View style={styles.options}>
         <RegisterOption
           image={require('../../assets/face.png')}
-          label="Facial Recognition"
-          onPress={() => console.log('Facial Recognition selected')}
+          label="Face Register"
+          onPress={() => console.log('Facial Register ')}
         />
         <RegisterOption
           image={require('../../assets/finger.png')}
-          label="Fingerprint"
-          onPress={() => console.log('Fingerprint selected')}
+          label="Fingerprint Register"
+          onPress={() => console.log('Fingerprint Register ')}
         />
       </View>
     </ScrollView>
