@@ -12,7 +12,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import AppHeader from '../../components/AppHeader';
 import {COLORS} from '../../constants/colors';
 
-const TABS = ['OverView', 'Day', 'TimeSheet', 'Report'];
+const TABS = ['OverView', 'Day', 'Biometric'];
 
 const SegmentedTabs = ({activeTab, onSelect}) => (
   <View style={styles.tabs}>
@@ -141,9 +141,79 @@ const DayView = () => (
   </>
 );
 
+const RegistrationButton = ({icon, label}) => (
+  <Pressable accessibilityRole="button" style={styles.registrationButton}>
+    <Icon color={COLORS.white} name={icon} size={18} />
+    <Text style={styles.registrationButtonText}>{label}</Text>
+  </Pressable>
+);
+
+const BiometricEmployeeCard = () => (
+  <View style={styles.biometricCard}>
+    <View style={styles.biometricEmployeeRow}>
+      <Pressable
+        accessibilityLabel="Upload employee profile photo"
+        accessibilityRole="button"
+        style={styles.photoUpload}>
+        <Icon color={COLORS.darkGreen} name="person-circle-outline" size={34} />
+        {/* <Text style={styles.photoUploadText}>Profile{`\n`}Photo</Text> */}
+      </Pressable>
+      <View style={styles.biometricEmployeeDetails}>
+        <Text style={styles.biometricEmployeeName}>Abhishek Kumar</Text>
+        <Text style={styles.employeeId}>Employee ID: A2_12M</Text>
+      </View>
+    </View>
+
+    <View style={styles.biometricStatusRow}>
+      <View style={styles.biometricStatusItem}>
+        <View style={[styles.statusIconCircle, styles.faceStatusIcon]}>
+          <Icon color="#B7791F" name="scan-outline" size={22} />
+        </View>
+        <View>
+          <Text style={styles.biometricLabel}>Face</Text>
+          <Text style={styles.pendingStatus}>Pending</Text>
+        </View>
+      </View>
+      <View style={styles.statusDivider} />
+      <View style={styles.biometricStatusItem}>
+        <View style={[styles.statusIconCircle, styles.fingerprintStatusIcon]}>
+          <Icon color="#7B61A8" name="finger-print-outline" size={22} />
+        </View>
+        <View>
+          <Text style={styles.biometricLabel}>Fingerprint</Text>
+          <Text style={styles.pendingStatus}>Pending</Text>
+        </View>
+      </View>
+    </View>
+
+    <View style={styles.registrationActions}>
+      <RegistrationButton icon="scan-outline" label="Face Register" />
+      <RegistrationButton icon="finger-print-outline" label="Fingerprint Register" />
+    </View>
+  </View>
+);
+
+const BiometricView = () => (
+  <>
+    <View style={styles.filters}>
+      <Filter icon="briefcase-outline" label="Department" />
+      <Filter icon="person" label="Designation" />
+    </View>
+    <View style={styles.biometricHeading}>
+      <Pressable accessibilityRole="button" style={styles.viewAll}>
+        <Text style={styles.viewAllText}>View All</Text>
+        <Icon color={COLORS.darkGreen} name="chevron-forward" size={20} />
+      </Pressable>
+      <Text style={styles.cardTitle}>All Employee</Text>
+    </View>
+    <BiometricEmployeeCard />
+  </>
+);
+
 const AdminDashboardScreen = () => {
   const [activeTab, setActiveTab] = useState('OverView');
   const isDayView = activeTab === 'Day';
+  const isBiometricView = activeTab === 'Biometric';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -159,7 +229,7 @@ const AdminDashboardScreen = () => {
           </View>
         </View>
         <SegmentedTabs activeTab={activeTab} onSelect={setActiveTab} />
-        {isDayView ? <DayView /> : <Overview />}
+        {isDayView ? <DayView /> : isBiometricView ? <BiometricView /> : <Overview />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -222,6 +292,24 @@ const styles = StyleSheet.create({
   progressLabel: {alignItems: 'center'},
   progressLabelText: {fontSize: 9, fontWeight: '700'},
   progressValue: {fontSize: 9, fontWeight: '700'},
+  biometricHeading: {alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 28},
+  biometricCard: {backgroundColor: COLORS.white, borderColor: '#D5D5D5', borderRadius: 14, borderWidth: 1, marginTop: 18, padding: 16},
+  biometricEmployeeRow: {alignItems: 'center', flexDirection: 'row'},
+  photoUploadText: {color: COLORS.darkGreen, fontSize: 10, fontWeight: '700', lineHeight: 13, marginTop: 2, textAlign: 'center'},
+  biometricEmployeeDetails: {marginLeft: 14},
+  biometricEmployeeName: {color: '#102C17', fontSize: 16, fontWeight: '800'},
+  employeeId: {color: '#667085', fontSize: 12, fontWeight: '600', marginTop: 5},
+  biometricStatusRow: {alignItems: 'center', backgroundColor: '#F7FBF7', borderRadius: 10, flexDirection: 'row', marginTop: 18, paddingHorizontal: 10, paddingVertical: 12},
+  biometricStatusItem: {alignItems: 'center', flex: 1, flexDirection: 'row'},
+  statusIconCircle: {alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', marginRight: 8, width: 36},
+  faceStatusIcon: {backgroundColor: '#FFF3D8'},
+  fingerprintStatusIcon: {backgroundColor: '#F0E9FB'},
+  biometricLabel: {color: '#102C17', fontSize: 12, fontWeight: '800'},
+  pendingStatus: {color: '#B7791F', fontSize: 11, fontWeight: '700', marginTop: 2},
+  statusDivider: {backgroundColor: '#D8E9DC', height: 34, width: 1},
+  registrationActions: {flexDirection: 'row', gap: 10, marginTop: 18},
+  registrationButton: {alignItems: 'center', backgroundColor: COLORS.darkGreen, borderRadius: 8, flex: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 42, paddingHorizontal: 8},
+  registrationButtonText: {color: COLORS.white, fontSize: 11, fontWeight: '800', marginLeft: 5},
 });
 
 export default AdminDashboardScreen;

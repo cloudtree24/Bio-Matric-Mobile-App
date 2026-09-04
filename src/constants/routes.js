@@ -5,4 +5,8 @@ export const ROUTES = {
   REGISTER: 'Register',
   ADMIN_LOGIN: 'AdminLogin',
   ADMIN_DASHBOARD: 'AdminDashboard',
+  ENROLLMENT_IDENTITY: 'EnrollmentIdentity',
+  FACE_CAMERA: 'FaceCamera',
+  FACE_REGISTRATION_RESULT: 'FaceRegistrationResult',
+  FACE_CHECK_IN_TEST: 'FaceCheckInTest',
 };

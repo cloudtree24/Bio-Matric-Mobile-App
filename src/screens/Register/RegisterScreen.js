@@ -11,6 +11,7 @@ import {
 
 import AppHeader from '../../components/AppHeader';
 import {COLORS} from '../../constants/colors';
+import {ROUTES} from '../../constants/routes';
 
 const RegisterOption = ({image, label, onPress}) => (
   <Pressable
@@ -25,7 +26,7 @@ const RegisterOption = ({image, label, onPress}) => (
   </Pressable>
 );
 
-const RegisterScreen = () => (
+const RegisterScreen = ({navigation}) => (
   <SafeAreaView style={styles.safeArea}>
     <AppHeader showNavigation />
     <ScrollView
@@ -41,12 +42,17 @@ const RegisterScreen = () => (
         <RegisterOption
           image={require('../../assets/face.png')}
           label="Face Register"
-          onPress={() => console.log('Facial Register ')}
+          onPress={() => navigation.navigate(ROUTES.ENROLLMENT_IDENTITY)}
         />
         <RegisterOption
           image={require('../../assets/finger.png')}
           label="Fingerprint Register"
           onPress={() => console.log('Fingerprint Register ')}
+        />
+        <RegisterOption
+          image={require('../../assets/face.png')}
+          label="Face Check-In Test"
+          onPress={() => navigation.navigate(ROUTES.FACE_CHECK_IN_TEST)}
         />
       </View>
     </ScrollView>
@@ -72,6 +78,7 @@ const styles = StyleSheet.create({
   },
   options: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 24,
     justifyContent: 'center',
     marginTop: 35,
