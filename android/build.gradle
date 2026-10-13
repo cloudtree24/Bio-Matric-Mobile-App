@@ -19,3 +19,18 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// AGP 9.2.1 lint's K2 UAST crashes when analyzing Worklets 0.12.1's
+// build.gradle.kts (findFirCompiledSymbol on a non-compiled declaration).
+// Skip only this third-party module's lint tasks, including debug/release/vital.
+// App lint and lint for other dependencies remain enabled. Remove when the
+// upstream lint/Worklets compatibility issue is resolved.
+subprojects { subproject ->
+    if (subproject.name == "react-native-worklets") {
+        subproject.tasks.configureEach { task ->
+            if (task.name.startsWith("lint")) {
+                task.enabled = false
+            }
+        }
+    }
+}

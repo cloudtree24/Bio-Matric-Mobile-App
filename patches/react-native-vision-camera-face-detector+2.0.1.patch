@@ -1,3 +1,47 @@
+diff --git a/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridFaceDetectorOutput.kt b/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridFaceDetectorOutput.kt
+index 8dc552b..f0629c2 100644
+--- a/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridFaceDetectorOutput.kt
++++ b/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridFaceDetectorOutput.kt
+@@ -87,9 +87,13 @@ class HybridFaceDetectorOutput(
+   }
+ 
+   override fun dispose() {
+-    orientationManager.stopDeviceOrientationListener()
+-    faceDetector.close()
+-    executor.close()
++    try {
++      orientationManager.stopDeviceOrientationListener()
++      faceDetector.close()
++      executor.close()
++    } finally {
++      super.dispose()
++    }
+   }
+ 
+   @OptIn(ExperimentalGetImage::class)
+diff --git a/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridImageFaceDetector.kt b/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridImageFaceDetector.kt
+index 5d116a9..da6650e 100644
+--- a/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridImageFaceDetector.kt
++++ b/node_modules/react-native-vision-camera-face-detector/android/src/main/java/com/margelo/nitro/camera/facedetector/HybridImageFaceDetector.kt
+@@ -24,11 +24,7 @@
+-  private fun resolveInputImage(
+-    input: Any?
+-  ): String {
+-    return when (input) {
+-      is String -> input
+-      is Map<*, *> -> {
+-        val uri = input["uri"] as? String
+-        uri ?: throw IllegalArgumentException("Invalid image object: missing 'uri'")
+-      }
+-      else -> throw IllegalArgumentException("Invalid image type. Expected string or { uri }")
+-    }
++  private fun resolveInputImage(input: InputImage): String {
++    // Nitro passes a generated variant, not a raw String or Map.
++    return input.match(
++      first = { uri -> uri },
++      second = { throw IllegalArgumentException("Resolve numeric image assets to a URI before detection") },
++      third = { image -> image.uri }
++    )
 diff --git a/node_modules/react-native-vision-camera-face-detector/lib/commonjs/hooks/useFaceDetectorOutput.js b/node_modules/react-native-vision-camera-face-detector/lib/commonjs/hooks/useFaceDetectorOutput.js
 index bcf140c..04bb60c 100644
 --- a/node_modules/react-native-vision-camera-face-detector/lib/commonjs/hooks/useFaceDetectorOutput.js

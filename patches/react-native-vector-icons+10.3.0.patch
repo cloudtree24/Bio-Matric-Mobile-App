@@ -1,0 +1,21 @@
+diff --git a/node_modules/react-native-vector-icons/android/build.gradle b/node_modules/react-native-vector-icons/android/build.gradle
+--- a/node_modules/react-native-vector-icons/android/build.gradle
++++ b/node_modules/react-native-vector-icons/android/build.gradle
+@@ -6,9 +6,7 @@
+         google()
+         gradlePluginPortal()
+     }
+-    dependencies {
+-        classpath("com.android.tools.build:gradle:7.0.4")
+-    }
++    // Use the Android Gradle plugin supplied by the host project.
+ }
+ 
+ def isNewArchitectureEnabled() {
+@@ -50,5 +48,5 @@
+ }
+ 
+ dependencies {
+-    implementation 'com.facebook.react:react-native:+'
++    implementation 'com.facebook.react:react-android'
+ }

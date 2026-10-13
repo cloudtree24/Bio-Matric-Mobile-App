@@ -1,100 +1,99 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
 
 import FaceCamera from '../../components/FaceCamera';
 import {COLORS} from '../../constants/colors';
 import {FACE_CONFIG} from '../../config/faceConfig';
 import {useCameraPermission} from '../../hooks/useCameraPermission';
 import faceRecognitionService from '../../services/faceRecognitionService';
-import {getLocalFaceRegistration} from '../../services/secureStorage';
-import {base64ToFloat32} from '../../utils/base64';
+import {getAllLocalFaces} from '../../services/localFaceStorage';
+import {findBestEmployeeMatch} from '../../services/faceMatchingService';
+import {createFaceCheckInController} from '../../services/faceCheckInService';
+import {saveLocalAttendance} from '../../services/localAttendanceStorage';
 
 const FaceCheckInTestScreen = ({navigation}) => {
   const {cameraPermissionStatus, requestCameraPermission} = useCameraPermission();
-  const [companyId, setCompanyId] = useState('1');
-  const [employeeId, setEmployeeId] = useState('1');
+  const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
-  const [isPreparing, setIsPreparing] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [result, setResult] = useState(null);
+  const [scanSession, setScanSession] = useState(0);
+  const [checkIn, setCheckIn] = useState(null);
+  const controller = useRef(null);
 
-  useEffect(() => () => setResult(null), []);
+  const resetCheckIn = useCallback(() => {
+    setResult(null);
+    setScanSession(value => value + 1);
+    setCheckIn(null);
+    controller.current = null;
+  }, []);
 
   const startTest = useCallback(async () => {
-    const nextEmployeeId = employeeId.trim();
-    const nextCompanyId = companyId.trim();
-    if (!nextEmployeeId || !nextCompanyId) {
-      setError('Enter both Employee ID and Company ID.');
-      return;
-    }
-
     setError('');
     setIsPreparing(true);
     try {
       const granted = cameraPermissionStatus === 'granted' || await requestCameraPermission();
       if (!granted) throw new Error('Camera permission is required for this test.');
       await faceRecognitionService.loadModel();
-      const registered = await getLocalFaceRegistration({
-        companyId: nextCompanyId,
-        employeeId: nextEmployeeId,
-      });
-      if (!registered?.embeddingBase64) {
-        throw new Error('No local face registration was found. Register this employee first.');
+      const registered = await getAllLocalFaces();
+      if (!registered.some(employee => employee.faces.some(face => face.embedding))) {
+        throw new Error('No registered faces were found on this device. Register an employee face first.');
       }
-      if (__DEV__) console.info('[face-check-in] local registration found', {companyId: nextCompanyId, employeeId: nextEmployeeId});
-      setEmployeeId(nextEmployeeId);
-      setCompanyId(nextCompanyId);
+      setEmployees(registered);
+      resetCheckIn();
       setIsReady(true);
     } catch (requestError) {
       setError(requestError?.message || 'Could not prepare the face check-in test.');
     } finally {
       setIsPreparing(false);
     }
-  }, [cameraPermissionStatus, companyId, employeeId, requestCameraPermission]);
+  }, [cameraPermissionStatus, requestCameraPermission, resetCheckIn]);
 
-  const verifyCapture = useCallback(async capturedImage => {
+  const initialStart = useRef(startTest);
+  useEffect(() => {
+    initialStart.current();
+  }, []);
+
+  const verifyCapture = useCallback(async embedding => {
     setError('');
-    try {
-      const registered = await getLocalFaceRegistration({companyId, employeeId});
-      if (!registered?.embeddingBase64) throw new Error('No local face registration was found. Register this employee first.');
-      const capturedEmbedding = await faceRecognitionService.getEmbedding(capturedImage);
-      const match = faceRecognitionService.matchEmbeddings(
-        base64ToFloat32(registered.embeddingBase64),
-        capturedEmbedding,
-      );
-
-      if (__DEV__) console.info('[face-check-in] local verification completed', {
+    const match = findBestEmployeeMatch(embedding, employees);
+    if (match.matched) {
+      if (controller.current) return match;
+      const companyId = match.companyId;
+      controller.current = createFaceCheckInController({
         companyId,
-        configuredCosineThreshold: FACE_CONFIG.cosineThreshold,
-        configuredEuclideanThreshold: FACE_CONFIG.euclideanThreshold,
-        distance: match.distance,
-        embeddingBytes: registered.embeddingBase64.length,
-        employeeId,
-        isMatch: match.isMatch,
-        similarity: match.similarity,
+        requireLocation: false,
+        submitAttendance: payload => saveLocalAttendance(companyId, payload),
+        onState: setCheckIn,
       });
-      setResult(match);
-    } catch (requestError) {
-      setError(requestError?.message || 'Face verification could not be completed.');
-      throw requestError;
+      setResult({...match, companyId});
+      await controller.current.identify(match);
     }
-  }, [companyId, employeeId]);
+    return match;
+  }, [employees]);
 
   if (isReady) {
     return (
       <View style={styles.cameraRoot}>
-        <FaceCamera isPaused={!!result} onCancel={() => navigation.goBack()} onComplete={verifyCapture} onError={cameraError => setError(cameraError?.message || 'Camera test failed.')} />
+        <FaceCamera key={scanSession} mode="recognition" isPaused={!!result} onCancel={() => navigation.goBack()} onComplete={verifyCapture} onError={cameraError => setError(cameraError?.message || 'Camera test failed.')} />
         {!!error && <Text accessibilityLiveRegion="polite" style={styles.cameraError}>{error}</Text>}
-        <Modal animationType="fade" onRequestClose={() => setResult(null)} transparent visible={!!result}>
+        <Modal animationType="fade" onRequestClose={() => { if (checkIn?.status !== 'submitting') resetCheckIn(); }} transparent visible={!!result}>
           <View style={styles.modalBackdrop}>
             <View accessibilityViewIsModal style={styles.modalCard}>
-              <Text style={[styles.resultIcon, result?.isMatch ? styles.match : styles.noMatch]}>{result?.isMatch ? '✓' : '!'}</Text>
-              <Text style={styles.modalTitle}>{result?.isMatch ? 'Face verified' : 'Face not matched'}</Text>
-              <Text style={styles.modalText}>{result?.isMatch ? 'The captured face matches this employee registration.' : 'The captured face does not meet the configured matching threshold.'}</Text>
-              <Text style={styles.scoreText}>Similarity: {result?.similarity?.toFixed(3)} · Distance: {result?.distance?.toFixed(3)}</Text>
-              <Text style={styles.thresholdText}>Required: similarity ≥ {FACE_CONFIG.cosineThreshold} · distance ≤ {FACE_CONFIG.euclideanThreshold}</Text>
-              <Pressable accessibilityRole="button" onPress={() => setResult(null)} style={styles.modalButton}><Text style={styles.modalButtonText}>Test again</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.closeButton}><Text style={styles.closeText}>Close</Text></Pressable>
+              <Text style={[styles.resultIcon, result?.matched ? styles.match : styles.noMatch]}>{result?.matched ? '✓' : '!'}</Text>
+              <Text style={styles.modalTitle}>{result?.matched ? 'Face matched' : 'Face not recognized'}</Text>
+              <Text style={styles.modalText}>{result?.matched ? 'Employee identified from faces saved on this device.' : 'The captured face does not meet the configured matching threshold.'}</Text>
+              <Text accessibilityLiveRegion="polite" style={styles.modalText}>
+                {checkIn?.status === 'success' ? (checkIn.response?.alreadyCheckedIn ? 'Already checked in today on this device.' : 'Check-In Successful — saved on this device.') : checkIn?.status === 'failed' ? checkIn.error : 'Saving local check-in…'}
+              </Text>
+              {checkIn?.status === 'submitting' && <ActivityIndicator color={COLORS.darkGreen} />}
+              {checkIn?.status === 'failed' && <Pressable accessibilityRole="button" onPress={() => controller.current.retry()} style={styles.modalButton}><Text style={styles.modalButtonText}>Retry check-in</Text></Pressable>}
+              <Text style={styles.scoreText}>{result?.employeeName} · Employee {result?.employeeId} · Company {result?.companyId} · Score: {result?.score?.toFixed(3)}</Text>
+              <Text style={styles.scoreText}>Second-best score: {result?.secondBestEmployeeId === null ? '—' : result?.secondBestScore?.toFixed(3)}</Text>
+              <Text style={styles.thresholdText}>Required: similarity ≥ {FACE_CONFIG.matchThreshold} · gap ≥ {FACE_CONFIG.minScoreGap}</Text>
+              <Pressable accessibilityRole="button" disabled={checkIn?.status === 'submitting'} onPress={resetCheckIn} style={styles.modalButton}><Text style={styles.modalButtonText}>Test again</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={checkIn?.status === 'submitting'} onPress={() => navigation.goBack()} style={styles.closeButton}><Text style={styles.closeText}>Close</Text></Pressable>
             </View>
           </View>
         </Modal>
@@ -106,11 +105,9 @@ const FaceCheckInTestScreen = ({navigation}) => {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.form}>
         <Text style={styles.title}>Face Check-In Test</Text>
-        <Text style={styles.description}>This test verifies a new camera capture against the face already registered for the entered employee.</Text>
-        <TextInput autoCapitalize="none" autoCorrect={false} editable={!isPreparing} onChangeText={setEmployeeId} placeholder="Employee ID" placeholderTextColor="#6B7280" style={styles.input} value={employeeId} />
-        <TextInput autoCapitalize="none" autoCorrect={false} editable={!isPreparing} onChangeText={setCompanyId} placeholder="Company ID" placeholderTextColor="#6B7280" style={styles.input} value={companyId} />
+        <Text style={styles.description}>Match against faces saved on this device and record a local check-in. No internet or location check is required.</Text>
         {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
-        <Pressable accessibilityRole="button" disabled={isPreparing} onPress={startTest} style={[styles.primaryButton, isPreparing && styles.disabled]}>{isPreparing ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>Start face test</Text>}</Pressable>
+        <Pressable accessibilityRole="button" disabled={isPreparing} onPress={startTest} style={[styles.primaryButton, isPreparing && styles.disabled]}>{isPreparing ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>Retry opening camera</Text>}</Pressable>
         <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.backText}>Back</Text></Pressable>
       </View>
     </SafeAreaView>
@@ -128,14 +125,13 @@ const styles = StyleSheet.create({
   disabled: {opacity: 0.7},
   error: {color: '#B42318', fontSize: 14, marginBottom: 14},
   form: {flex: 1, padding: 24, paddingTop: 56},
-  input: {backgroundColor: COLORS.white, borderColor: COLORS.primary, borderRadius: 10, borderWidth: 1, color: COLORS.darkGreen, fontSize: 16, marginBottom: 14, paddingHorizontal: 14, paddingVertical: 13},
-  match: {backgroundColor: '#DDF6E2'},
+  match: {backgroundColor: '#14BFA5'},
   modalBackdrop: {alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.48)', flex: 1, justifyContent: 'center', padding: 24},
-  modalButton: {alignItems: 'center', backgroundColor: COLORS.darkGreen, borderRadius: 10, marginTop: 24, padding: 14, width: '100%'},
+  modalButton: {alignItems: 'center', backgroundColor: '#14BFA5', borderRadius: 12, marginTop: 24, padding: 14, width: '100%'},
   modalButtonText: {color: COLORS.white, fontSize: 16, fontWeight: '800'},
-  modalCard: {alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 18, padding: 26, width: '100%'},
-  modalText: {color: '#476452', fontSize: 15, lineHeight: 22, marginTop: 10, textAlign: 'center'},
-  modalTitle: {color: COLORS.darkGreen, fontSize: 25, fontWeight: '800', marginTop: 16},
+  modalCard: {alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 24, padding: 28, width: '100%'},
+  modalText: {color: '#68707A', fontSize: 15, lineHeight: 22, marginTop: 10, textAlign: 'center'},
+  modalTitle: {color: '#20262D', fontSize: 27, fontWeight: '800', marginTop: 16},
   noMatch: {backgroundColor: '#FFF1D6'},
   primaryButton: {alignItems: 'center', backgroundColor: COLORS.darkGreen, borderRadius: 10, justifyContent: 'center', minHeight: 50},
   primaryText: {color: COLORS.white, fontSize: 16, fontWeight: '800'},

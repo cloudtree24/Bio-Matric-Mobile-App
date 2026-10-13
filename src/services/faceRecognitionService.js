@@ -65,7 +65,8 @@ class FaceRecognitionService {
         0,
         undefined,
         false,
-        {mode: 'cover', onlyScaleDown: false},
+        // Face crops are rectangular; the model requires exactly 112 x 112.
+        {mode: 'stretch', onlyScaleDown: false},
       );
       resizedPath = (resized.path || resized.uri).replace('file://', '');
       const processedImage = await RNFS.readFile(resizedPath, 'base64');

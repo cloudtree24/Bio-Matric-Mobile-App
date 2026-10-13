@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 
 import AppHeader from '../../components/AppHeader';
 import {COLORS} from '../../constants/colors';
+import {ROUTES} from '../../constants/routes';
 
 const TABS = ['OverView', 'Day', 'Biometric'];
 
@@ -210,7 +211,7 @@ const BiometricView = () => (
   </>
 );
 
-const AdminDashboardScreen = () => {
+const AdminDashboardScreen = ({navigation}) => {
   const [activeTab, setActiveTab] = useState('OverView');
   const isDayView = activeTab === 'Day';
   const isBiometricView = activeTab === 'Biometric';
@@ -228,6 +229,25 @@ const AdminDashboardScreen = () => {
             <Icon color="#7CB454" name="person-circle" size={38} />
           </View>
         </View>
+        <View style={styles.registerUserSection}>
+          <View style={styles.registerUserHeading}>
+            <Icon color={COLORS.darkGreen} name="person-add-outline" size={28} />
+            <Text style={styles.cardTitle}>Register User</Text>
+          </View>
+          <Text style={styles.registerUserDescription}>
+            Open registration to enroll an employee's face.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate(ROUTES.REGISTER)}
+            style={({pressed}) => [
+              styles.registerUserButton,
+              pressed && styles.registerUserButtonPressed,
+            ]}>
+            <Text style={styles.registerUserButtonText}>Register User</Text>
+            <Icon color={COLORS.white} name="arrow-forward" size={20} />
+          </Pressable>
+        </View>
         <SegmentedTabs activeTab={activeTab} onSelect={setActiveTab} />
         {isDayView ? <DayView /> : isBiometricView ? <BiometricView /> : <Overview />}
       </ScrollView>
@@ -238,6 +258,12 @@ const AdminDashboardScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {flex: 1, backgroundColor: COLORS.lightGreen},
   content: {padding: 18, paddingBottom: 36},
+  registerUserSection: {backgroundColor: COLORS.white, borderColor: COLORS.primary, borderRadius: 14, borderWidth: 1, marginTop: 20, padding: 18},
+  registerUserHeading: {alignItems: 'center', flexDirection: 'row', gap: 10},
+  registerUserDescription: {color: '#667085', fontSize: 14, lineHeight: 20, marginTop: 10},
+  registerUserButton: {alignItems: 'center', backgroundColor: COLORS.darkGreen, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, minHeight: 48, paddingHorizontal: 16, paddingVertical: 12},
+  registerUserButtonPressed: {opacity: 0.8},
+  registerUserButtonText: {color: COLORS.white, fontSize: 16, fontWeight: '700'},
   titleRow: {alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between'},
   title: {color: COLORS.darkGreen, fontSize: 24, fontWeight: '800'},
   titleIcons: {alignItems: 'center', flexDirection: 'row', gap: 12},

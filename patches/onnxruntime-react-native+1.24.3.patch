@@ -1,0 +1,67 @@
+diff --git a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
+--- a/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
++++ b/node_modules/onnxruntime-react-native/android/src/main/java/ai/onnxruntime/reactnative/OnnxruntimeModule.java
+@@ -7,12 +7,14 @@
+ import java.util.HashMap;
+ import android.os.Build;
+ import androidx.annotation.NonNull;
++import androidx.annotation.OptIn;
+ import androidx.annotation.RequiresApi;
+ import com.facebook.react.bridge.JavaScriptContextHolder;
+ import com.facebook.react.bridge.ReactMethod;
+ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.bridge.ReactContextBaseJavaModule;
+ import com.facebook.react.turbomodule.core.CallInvokerHolderImpl;
++import com.facebook.react.common.annotations.FrameworkAPI;
+ 
+ @RequiresApi(api = Build.VERSION_CODES.N)
+ public class OnnxruntimeModule extends ReactContextBaseJavaModule {
+@@ -29,6 +31,7 @@
+     return "Onnxruntime";
+   }
+ 
++  @OptIn(markerClass = FrameworkAPI.class)
+   native void nativeInstall(long jsiPointer, CallInvokerHolderImpl jsCallInvokerHolder);
+ 
+   native void nativeCleanup();
+@@ -42,6 +45,7 @@
+   /**
+    * Install onnxruntime JSI API
+    */
++  @OptIn(markerClass = FrameworkAPI.class)
+   @ReactMethod(isBlockingSynchronousMethod = true)
+   public boolean install() {
+     try {
+diff --git a/node_modules/onnxruntime-react-native/android/build.gradle b/node_modules/onnxruntime-react-native/android/build.gradle
+--- a/node_modules/onnxruntime-react-native/android/build.gradle
++++ b/node_modules/onnxruntime-react-native/android/build.gradle
+@@ -66,7 +66,10 @@
+ boolean useQnn = readPackageJsonField('onnxruntimeUseQnn') == "true"
+ 
+ def REACT_NATIVE_VERSION = ['node', '--print', "JSON.parse(require('fs').readFileSync(require.resolve('react-native/package.json'), 'utf-8')).version"].execute(null, rootDir).text.trim()
+-def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION.split("\\.")[1].toInteger()
++def REACT_NATIVE_VERSION_PARTS = REACT_NATIVE_VERSION.split("\\.")
++def REACT_NATIVE_MAJOR_VERSION = REACT_NATIVE_VERSION_PARTS[0].toInteger()
++def REACT_NATIVE_MINOR_VERSION = REACT_NATIVE_VERSION_PARTS[1].toInteger()
++def REACT_NATIVE_AT_LEAST_0_71 = REACT_NATIVE_MAJOR_VERSION > 0 || REACT_NATIVE_MINOR_VERSION >= 71
+ 
+ android {
+ // This is needed by the new AndroidManifestNew.xml
+@@ -82,7 +85,7 @@
+     externalNativeBuild {
+       cmake {
+         cppFlags "-O2 -frtti -fexceptions -Wall -Wno-unused-variable -fstack-protector-all"
+-        if (REACT_NATIVE_MINOR_VERSION >= 71) {
++        if (REACT_NATIVE_AT_LEAST_0_71) {
+           // fabricjni required c++_shared
+           arguments "-DANDROID_STL=c++_shared",
+             "-DNODE_MODULES_DIR=${nodeModules}",
+@@ -247,7 +250,7 @@
+     extractLibs "com.microsoft.onnxruntime:onnxruntime-android:latest.integration@aar"
+   }
+ 
+-  if (VersionNumber.parse(REACT_NATIVE_VERSION) < VersionNumber.parse("0.71")) {
++  if (!REACT_NATIVE_AT_LEAST_0_71) {
+     extractLibs "com.facebook.fbjni:fbjni:+:headers"
+     extractLibs "com.facebook.fbjni:fbjni:+"
+   }

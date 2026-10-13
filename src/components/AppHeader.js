@@ -1,14 +1,25 @@
 import React, {useState} from 'react';
-import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Alert, Image, Linking, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 
 import {COLORS} from '../constants/colors';
 import {ROUTES} from '../constants/routes';
+import {useAdminSession} from '../context/AdminSessionContext';
 
 const AppHeader = () => {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const navigation = useNavigation();
+  const {isAdminLoggedIn} = useAdminSession();
+
+  const contactSupport = async () => {
+    setIsMenuVisible(false);
+    try {
+      await Linking.openURL('tel:8709138957');
+    } catch {
+      Alert.alert('Contact Customer Support', 'Please call 8709138957.');
+    }
+  };
 
   const goTo = route => {
     setIsMenuVisible(false);
@@ -52,30 +63,16 @@ const AppHeader = () => {
             style={styles.backdrop}
           />
           <View accessibilityViewIsModal style={styles.menu}>
-            <Text style={styles.menuTitle}>Quick menu</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => goTo(ROUTES.ADMIN_LOGIN)}
+              onPress={isAdminLoggedIn ? contactSupport : () => goTo(ROUTES.ADMIN_LOGIN)}
               style={({pressed}) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
               <View style={styles.menuIconWrap}>
-                <Icon color={COLORS.darkGreen} name="shield-checkmark-outline" size={21} />
+                <Icon color={COLORS.darkGreen} name={isAdminLoggedIn ? 'call-outline' : 'shield-checkmark-outline'} size={21} />
               </View>
-              <View>
-                <Text style={styles.menuButtonText}>Admin</Text>
-                <Text style={styles.menuButtonHint}>Sign in to the dashboard</Text>
-              </View>
-            </Pressable>
-            <View style={styles.menuDivider} />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => goTo(ROUTES.REGISTER)}
-              style={({pressed}) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
-              <View style={styles.menuIconWrap}>
-                <Icon color={COLORS.darkGreen} name="person-add-outline" size={21} />
-              </View>
-              <View>
-                <Text style={styles.menuButtonText}>Register</Text>
-                <Text style={styles.menuButtonHint}>Submit your registration</Text>
+              <View style={styles.menuButtonContent}>
+                <Text style={styles.menuButtonText}>{isAdminLoggedIn ? 'Contact Customer Support' : 'Admin'}</Text>
+                <Text style={styles.menuButtonHint}>{isAdminLoggedIn ? '8709138957' : 'Sign in to the dashboard'}</Text>
               </View>
             </Pressable>
           </View>
@@ -143,15 +140,6 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
-  menuTitle: {
-    color: '#6B7280',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    textTransform: 'uppercase',
-  },
   menuButton: {
     alignItems: 'center',
     borderRadius: 10,
@@ -166,6 +154,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  menuButtonContent: {
+    flex: 1,
+  },
   menuButtonHint: {
     color: '#64748B',
     fontSize: 12,
@@ -179,11 +170,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
     width: 40,
-  },
-  menuDivider: {
-    backgroundColor: '#E5E7EB',
-    height: 1,
-    marginHorizontal: 8,
   },
 });
 

@@ -46,3 +46,14 @@ The published ONNX bridge still uses the legacy `RCTCxxBridge` runtime installat
 ## Known V1 boundary
 
 This build enrolls a face only. Multi-user face identification/login and attendance Check-In/Check-Out remain deferred until their backend contracts are available.
+
+## Three-sample registration and company identification
+
+- JavaScript client sends exactly three cropped JPEG images and three raw Float32 Base64 embeddings in one request. Optional employee name comes from enrollment.
+- `src/services/FaceApiService.js` owns routes. Set `FACE_REGISTRATION_ROUTE` and `FACE_EMPLOYEES_ROUTE` in the native environment configuration and rebuild. Defaults are `/EmployeeBiomatricRegister/SaveEmployeeImageStringFormat` and `/api/EmployeeFace/GetByCompany/{companyId}`.
+- The old backend does not support this payload. Deploy backend support before end-to-end registration testing; the client deliberately does not discard two samples or silently fall back to single-face saving.
+- Successful registration invalidates the company cache and uses the existing attendance activation endpoint. Identification is a test screen and does not submit attendance automatically.
+- Company faces are fetched once, decoded once, and retained in memory. Call `invalidateFaceCache(companyId)` to refresh after external enrollment changes.
+- Both paths detect again on the orientation-normalized still photo, require exactly one face, crop its bounds, then use the existing 112×112 RGB/NCHW `pixel / 127.5 - 1` pipeline and L2-normalized MobileFaceNet output. Both use the same bounds crop with no separate landmark alignment.
+- Tune `FACE_CONFIG.matchThreshold` (default 0.75), registration consistency threshold, and processing interval (400 ms). Inference is serialized; actual cadence depends on device capture and inference speed.
+- On Android and iOS, verify photo orientation and crop location, zero/multiple-face rejection during capture, three-sample progress, same-person rejection, one save request, activation retry, company isolation, best of three matching, no per-frame network calls, and matching stops after success until Test again.

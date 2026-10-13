@@ -8,7 +8,7 @@ import {useFaceRegistration} from '../../hooks/useFaceRegistration';
 import faceRecognitionService from '../../services/faceRecognitionService';
 
 const FaceCameraScreen = ({navigation, route}) => {
-  const {employeeId, companyId} = route.params || {};
+  const {employeeId, employeeName, companyId} = route.params || {};
   const {cameraPermissionStatus, requestCameraPermission} = useCameraPermission();
   const {registerFace} = useFaceRegistration();
   const [isPreparing, setIsPreparing] = useState(true);
@@ -36,17 +36,17 @@ const FaceCameraScreen = ({navigation, route}) => {
     return () => { isMounted = false; };
   }, [cameraPermissionStatus, companyId, employeeId, requestCameraPermission]);
 
-  const handleComplete = useCallback(async capturedImage => {
+  const handleComplete = useCallback(async faces => {
     setCameraError('');
     try {
-      await registerFace({capturedImage, companyId, employeeId});
+      await registerFace({faces, companyId, employeeId, employeeName});
       navigation.replace(ROUTES.FACE_REGISTRATION_RESULT, {companyId, employeeId, status: 'success'});
     } catch (error) {
       const message = error?.message || 'Face registration could not be completed.';
       const activationPending = message.includes('activation failed');
       navigation.replace(ROUTES.FACE_REGISTRATION_RESULT, {companyId, employeeId, message, status: activationPending ? 'activationPending' : 'failure'});
     }
-  }, [companyId, employeeId, navigation, registerFace]);
+  }, [companyId, employeeId, employeeName, navigation, registerFace]);
 
   if (isPreparing) {
     return <SafeAreaView style={styles.state}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.stateText}>Preparing secure face registration…</Text></SafeAreaView>;
@@ -63,7 +63,7 @@ const FaceCameraScreen = ({navigation, route}) => {
 
   return (
     <View style={styles.root}>
-      <FaceCamera onCancel={() => navigation.goBack()} onComplete={handleComplete} onError={error => setCameraError(error?.message || 'Face capture failed. Try again.')} />
+      <FaceCamera mode="registration" onCancel={() => navigation.goBack()} onComplete={handleComplete} onError={error => setCameraError(error?.message || 'Face capture failed. Try again.')} />
       {!!cameraError && <Text accessibilityLiveRegion="polite" style={styles.cameraError}>{cameraError}</Text>}
     </View>
   );

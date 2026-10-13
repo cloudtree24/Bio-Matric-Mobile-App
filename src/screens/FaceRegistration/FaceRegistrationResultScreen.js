@@ -9,7 +9,7 @@ import {useFaceRegistration} from '../../hooks/useFaceRegistration';
 const copy = {
   activationPending: {description: 'Your face was saved, but attendance activation is pending. You can safely retry activation.', title: 'Activation pending'},
   failure: {description: 'Face registration was not completed. You can start again.', title: 'Registration failed'},
-  success: {description: 'Your face has been registered and attendance access is active.', title: 'Face registered'},
+  success: {description: 'Your face has been saved on this device and is ready for local matching.', title: 'Face registered'},
 };
 
 const FaceRegistrationResultScreen = ({navigation, route}) => {

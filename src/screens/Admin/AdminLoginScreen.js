@@ -14,9 +14,11 @@ import {
 import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
 import AppHeader from '../../components/AppHeader';
+import {useAdminSession} from '../../context/AdminSessionContext';
 const ADMIN_PIN = '1234';
 
 const AdminLoginScreen = ({navigation}) => {
+  const {setIsAdminLoggedIn} = useAdminSession();
   const [userId, setUserId] = useState('');
   const [pin, setPin] = useState('');
 
@@ -31,6 +33,7 @@ const AdminLoginScreen = ({navigation}) => {
       return;
     }
 
+    setIsAdminLoggedIn(true);
     navigation.replace(ROUTES.ADMIN_DASHBOARD);
   };
 

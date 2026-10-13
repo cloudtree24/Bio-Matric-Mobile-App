@@ -1,0 +1,93 @@
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/extensions/ImageProxy+getPixelBuffer.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/extensions/ImageProxy+getPixelBuffer.kt
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/extensions/ImageProxy+getPixelBuffer.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/extensions/ImageProxy+getPixelBuffer.kt
+@@ -2,12 +2,14 @@
+ 
+ import android.hardware.HardwareBuffer
+ import android.os.Build
++import androidx.annotation.RequiresApi
+ import androidx.camera.core.ImageProxy
+ import com.margelo.nitro.camera.utils.DirectByteBufferPool
+ import com.margelo.nitro.core.ArrayBuffer
+ import java.nio.ByteBuffer
+ 
+ val HardwareBuffer.isCpuReadable: Boolean
++  @RequiresApi(Build.VERSION_CODES.O)
+   get() {
+     val readableUsageFlags = HardwareBuffer.USAGE_CPU_READ_RARELY or HardwareBuffer.USAGE_CPU_READ_OFTEN
+     return (usage and readableUsageFlags) != 0L
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/HybridCameraDeviceFactory.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/HybridCameraDeviceFactory.kt
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/HybridCameraDeviceFactory.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/HybridCameraDeviceFactory.kt
+@@ -1,5 +1,6 @@
+ package com.margelo.nitro.camera
+ 
++import android.annotation.SuppressLint
+ import android.content.Context
+ import android.content.SharedPreferences
+ import android.util.Log
+@@ -84,6 +85,8 @@
+     })
+   }
+ 
++  // CameraX's adapter ID is needed to match persisted device IDs.
++  @SuppressLint("RestrictedApi")
+   override fun getCameraForId(id: String): HybridCameraDeviceSpec? {
+     val cameraInfo =
+       cameraProvider.availableCameraInfos.firstOrNull { cameraInfo ->
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/inputs/HybridPhysicalCameraDevice.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/inputs/HybridPhysicalCameraDevice.kt
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/inputs/HybridPhysicalCameraDevice.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/inputs/HybridPhysicalCameraDevice.kt
+@@ -35,11 +35,11 @@
+  * This type has less available information than the combined [CameraInfo].
+  */
+ @SuppressLint("RestrictedApi")
++@OptIn(ExperimentalCamera2Interop::class)
+ class HybridPhysicalCameraDevice(
+   override val cameraInfo: CameraInfo,
+ ) : HybridCameraDeviceSpec(),
+   NativeCameraDevice {
+-  @OptIn(ExperimentalCamera2Interop::class)
+   private val camera2Info = Camera2CameraInfo.fromSafe(cameraInfo)
+ 
+   override val id: String
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridPhotoOutput.kt
+@@ -1,5 +1,6 @@
+ package com.margelo.nitro.camera.hybrids.outputs
+ 
++import android.annotation.SuppressLint
+ import android.media.MediaActionSound
+ import android.util.Log
+ import androidx.camera.core.CameraInfo
+@@ -138,6 +139,8 @@
+   override val supportsCameraCalibrationDataDelivery: Boolean
+     get() = false
+ 
++  // The attached camera determines AUTO mirroring for this capture use case.
++  @SuppressLint("RestrictedApi")
+   private fun shouldMirror(): Boolean {
+     val camera = imageCapture?.camera ?: return false
+     return when (mirrorMode) {
+diff --git a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridVideoOutput.kt b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridVideoOutput.kt
+--- a/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridVideoOutput.kt
++++ b/node_modules/react-native-vision-camera/android/src/main/java/com/margelo/nitro/camera/hybrids/outputs/HybridVideoOutput.kt
+@@ -3,7 +3,9 @@
+ import android.annotation.SuppressLint
+ import android.content.Context
+ import android.util.Log
++import androidx.annotation.OptIn
+ import androidx.camera.core.DynamicRange
++import androidx.camera.video.ExperimentalPersistentRecording
+ import androidx.camera.video.FileOutputOptions
+ import androidx.camera.video.Recorder
+ import androidx.camera.video.VideoCapture
+@@ -143,6 +145,7 @@
+   }
+ 
+   @SuppressLint("MissingPermission")
++  @OptIn(ExperimentalPersistentRecording::class)
+   override fun createRecorder(settings: RecorderSettings): Promise<HybridRecorderSpec> {
+     return Promise.async {
+       val file =

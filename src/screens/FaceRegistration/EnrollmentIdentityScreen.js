@@ -8,6 +8,7 @@ import {useFaceRegistration} from '../../hooks/useFaceRegistration';
 
 const EnrollmentIdentityScreen = ({navigation}) => {
   const [employeeId, setEmployeeId] = useState('');
+  const [employeeName, setEmployeeName] = useState('');
   const [companyId, setCompanyId] = useState('');
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
@@ -25,21 +26,22 @@ const EnrollmentIdentityScreen = ({navigation}) => {
     setIsChecking(true);
     try {
       await checkFaceAccess({employeeId: nextEmployeeId, companyId: nextCompanyId});
-      navigation.navigate(ROUTES.FACE_CAMERA, {companyId: nextCompanyId, employeeId: nextEmployeeId});
+      navigation.navigate(ROUTES.FACE_CAMERA, {companyId: nextCompanyId, employeeId: nextEmployeeId, employeeName: employeeName.trim()});
     } catch (requestError) {
       setError(requestError?.message || 'Could not verify face-registration access.');
     } finally {
       setIsChecking(false);
     }
-  }, [checkFaceAccess, companyId, employeeId, navigation]);
+  }, [checkFaceAccess, companyId, employeeId, employeeName, navigation]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader />
       <View style={styles.content}>
         <Text style={styles.title}>Face registration</Text>
-        <Text style={styles.description}>Enter Employee ID and Company ID. This test registration stays on this device.</Text>
+        <Text style={styles.description}>Enter the employee details to save 3 face samples locally on this device. Use a different Employee ID for each person.</Text>
         <TextInput autoCapitalize="none" autoCorrect={false} editable={!isChecking} onChangeText={setEmployeeId} placeholder="Employee ID" placeholderTextColor="#6B7280" style={styles.input} value={employeeId} />
+        <TextInput editable={!isChecking} onChangeText={setEmployeeName} placeholder="Employee name" placeholderTextColor="#6B7280" style={styles.input} value={employeeName} />
         <TextInput autoCapitalize="none" autoCorrect={false} editable={!isChecking} onChangeText={setCompanyId} placeholder="Company ID" placeholderTextColor="#6B7280" style={styles.input} value={companyId} />
         {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
         <Pressable accessibilityRole="button" disabled={isChecking} onPress={continueToCamera} style={[styles.button, isChecking && styles.buttonDisabled]}>

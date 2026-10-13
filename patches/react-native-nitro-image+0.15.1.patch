@@ -1,0 +1,104 @@
+diff --git a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/HybridImage.kt b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/HybridImage.kt
+--- a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/HybridImage.kt
++++ b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/HybridImage.kt
+@@ -46,6 +46,7 @@
+ 
+     override fun dispose() {
+         bitmap.recycle()
++        super.dispose()
+     }
+ 
+     override fun toRawPixelData(allowGpu: Boolean?): RawPixelData {
+diff --git a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toCpuAccessible.kt b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toCpuAccessible.kt
+--- a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toCpuAccessible.kt
++++ b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toCpuAccessible.kt
+@@ -1,9 +1,10 @@
+ package com.margelo.nitro.image.extensions
+ 
+ import android.graphics.Bitmap
++import android.os.Build
+ 
+ fun Bitmap.toCpuAccessible(): Bitmap {
+-    if (this.config == Bitmap.Config.HARDWARE) {
++    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && this.config == Bitmap.Config.HARDWARE) {
+         // HARDWARE isn't CPU-accessible, so we convert to ARGB
+         return this.copy(Bitmap.Config.ARGB_8888, true)
+     }
+diff --git a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toMutable.kt b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toMutable.kt
+--- a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toMutable.kt
++++ b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+toMutable.kt
+@@ -1,6 +1,7 @@
+ package com.margelo.nitro.image.extensions
+ 
+ import android.graphics.Bitmap
++import android.os.Build
+ 
+ fun Bitmap.toMutable(forceCopy: Boolean): Bitmap {
+     if (isMutable && !forceCopy) {
+@@ -8,7 +9,7 @@
+         return this
+     }
+     var config = this.config ?: throw Error("Failed to get Bitmap's format! $this")
+-    if (config == Bitmap.Config.HARDWARE) {
++    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && config == Bitmap.Config.HARDWARE) {
+         // HARDWARE Bitmaps are not mutable, so we need to change to ARGB
+         config = Bitmap.Config.ARGB_8888
+     }
+diff --git a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+pixelFormat.kt b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+pixelFormat.kt
+--- a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+pixelFormat.kt
++++ b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Bitmap+pixelFormat.kt
+@@ -8,6 +8,18 @@
+ 
+ val Bitmap.pixelFormat: PixelFormat
+     get() {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && config == Bitmap.Config.HARDWARE) {
++                // Hardware Buffer is either RGBA or RGBX
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                    when (hardwareBuffer.format) {
++                        HardwareBuffer.RGBA_8888 -> return PixelFormat.RGBA
++                        HardwareBuffer.RGBX_8888 -> return PixelFormat.RGBX
++                        HardwareBuffer.RGB_888 -> return PixelFormat.RGB
++                    }
++                }
++                return PixelFormat.UNKNOWN
++            }
++
+         when (config) {
+             Bitmap.Config.ARGB_8888 -> {
+                 // On Android, ARGB_8888 defines memory layout inside an Int, not the byte order.
+@@ -23,17 +35,6 @@
+                     return PixelFormat.ARGB
+                 }
+             }
+-            Bitmap.Config.HARDWARE -> {
+-                // Hardware Buffer is either RGBA or RGBX
+-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+-                    when (hardwareBuffer.format) {
+-                        HardwareBuffer.RGBA_8888 -> return PixelFormat.RGBA
+-                        HardwareBuffer.RGBX_8888 -> return PixelFormat.RGBX
+-                        HardwareBuffer.RGB_888 -> return PixelFormat.RGB
+-                    }
+-                }
+-                return PixelFormat.UNKNOWN
+-            }
+             else -> return PixelFormat.UNKNOWN
+         }
+     }
+diff --git a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Color+toBitmapColor.kt b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Color+toBitmapColor.kt
+--- a/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Color+toBitmapColor.kt
++++ b/node_modules/react-native-nitro-image/android/src/main/java/com/margelo/nitro/image/extensions/Color+toBitmapColor.kt
+@@ -1,8 +1,14 @@
+ package com.margelo.nitro.image.extensions
+ 
+ import com.margelo.nitro.image.Color
++import android.os.Build
+ 
+ fun Color.toBitmapColor(): Int {
++    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
++        // Float channel overloads were added in API 26. Match their 8-bit rounding.
++        fun channel(value: Double): Int = (value.coerceIn(0.0, 1.0) * 255.0 + 0.5).toInt()
++        return android.graphics.Color.argb(channel(a ?: 1.0), channel(r), channel(g), channel(b))
++    }
+     if (a != null) {
+         // We have an alpha Channel
+         return android.graphics.Color.argb(a.toFloat(), r.toFloat(), g.toFloat(), b.toFloat())

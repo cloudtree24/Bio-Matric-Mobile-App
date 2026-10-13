@@ -38,6 +38,7 @@ const RegisterScreen = ({navigation}) => (
         source={require('../../assets/Register.png')}
         style={styles.heroImage}
       />
+      <Text style={styles.adminNotice}>Only admin can register face.</Text>
       <View style={styles.options}>
         <RegisterOption
           image={require('../../assets/face.png')}
@@ -83,6 +84,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 35,
     width: '100%',
+  },
+  adminNotice: {
+    color: COLORS.darkGreen,
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 24,
+    marginTop: 20,
+    textAlign: 'center',
   },
   optionWrapper: {
     alignItems: 'center',
