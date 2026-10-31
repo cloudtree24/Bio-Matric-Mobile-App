@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Alert, Image, Linking, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {useNavigation} from '@react-navigation/native';
 
@@ -11,15 +11,6 @@ const AppHeader = () => {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const navigation = useNavigation();
   const {isAdminLoggedIn} = useAdminSession();
-
-  const contactSupport = async () => {
-    setIsMenuVisible(false);
-    try {
-      await Linking.openURL('tel:8709138957');
-    } catch {
-      Alert.alert('Contact Customer Support', 'Please call 8709138957.');
-    }
-  };
 
   const goTo = route => {
     setIsMenuVisible(false);
@@ -65,14 +56,14 @@ const AppHeader = () => {
           <View accessibilityViewIsModal style={styles.menu}>
             <Pressable
               accessibilityRole="button"
-              onPress={isAdminLoggedIn ? contactSupport : () => goTo(ROUTES.ADMIN_LOGIN)}
+              onPress={() => goTo(isAdminLoggedIn ? ROUTES.ADMIN_SIGN_OUT : ROUTES.ADMIN_LOGIN)}
               style={({pressed}) => [styles.menuButton, pressed && styles.menuButtonPressed]}>
               <View style={styles.menuIconWrap}>
-                <Icon color={COLORS.darkGreen} name={isAdminLoggedIn ? 'call-outline' : 'shield-checkmark-outline'} size={21} />
+                <Icon color={COLORS.darkGreen} name={isAdminLoggedIn ? 'log-out-outline' : 'shield-checkmark-outline'} size={21} />
               </View>
               <View style={styles.menuButtonContent}>
-                <Text style={styles.menuButtonText}>{isAdminLoggedIn ? 'Contact Customer Support' : 'Admin'}</Text>
-                <Text style={styles.menuButtonHint}>{isAdminLoggedIn ? '8709138957' : 'Sign in to the dashboard'}</Text>
+                <Text style={styles.menuButtonText}>{isAdminLoggedIn ? 'Sign out' : 'Admin'}</Text>
+                <Text style={styles.menuButtonHint}>{isAdminLoggedIn ? 'Leave the admin dashboard' : 'Sign in to the dashboard'}</Text>
               </View>
             </Pressable>
           </View>

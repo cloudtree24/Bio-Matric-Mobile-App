@@ -5,6 +5,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {ROUTES} from '../constants/routes';
 import AdminDashboardScreen from '../screens/Admin/AdminDashboardScreen';
 import AdminLoginScreen from '../screens/Admin/AdminLoginScreen';
+import AdminSignOutScreen from '../screens/Admin/AdminSignOutScreen';
 import RegisterScreen from '../screens/Register/RegisterScreen';
 import SplashScreen from '../screens/Splash/SplashScreen';
 import LoginScreen from '../screens/LoginScreen/LoginScreen';
@@ -28,6 +29,7 @@ const AppNavigator = () => (
       <Stack.Screen name={ROUTES.FACE_REGISTRATION_RESULT} component={FaceRegistrationResultScreen} />
       <Stack.Screen name={ROUTES.FACE_CHECK_IN_TEST} component={FaceCheckInTestScreen} />
       <Stack.Screen name={ROUTES.ADMIN_LOGIN} component={AdminLoginScreen} />
+      <Stack.Screen name={ROUTES.ADMIN_SIGN_OUT} component={AdminSignOutScreen} />
       <Stack.Screen
         name={ROUTES.ADMIN_DASHBOARD}
         component={AdminDashboardScreen}

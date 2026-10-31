@@ -4,6 +4,7 @@ export const ROUTES = {
   USER_SUBMIT: 'UserSubmit',
   REGISTER: 'Register',
   ADMIN_LOGIN: 'AdminLogin',
+  ADMIN_SIGN_OUT: 'AdminSignOut',
   ADMIN_DASHBOARD: 'AdminDashboard',
   ENROLLMENT_IDENTITY: 'EnrollmentIdentity',
   FACE_CAMERA: 'FaceCamera',

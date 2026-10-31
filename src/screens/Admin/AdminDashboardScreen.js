@@ -1,4 +1,6 @@
-import React, {useState} from 'react';
+// @refresh reset
+// Remount this screen during Fast Refresh when its dashboard hooks change.
+import React from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -8,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-
+import CheckInCard from '../../components/CheckInCard';
 import AppHeader from '../../components/AppHeader';
 import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
@@ -211,53 +213,212 @@ const BiometricView = () => (
   </>
 );
 
-const AdminDashboardScreen = ({navigation}) => {
-  const [activeTab, setActiveTab] = useState('OverView');
-  const isDayView = activeTab === 'Day';
-  const isBiometricView = activeTab === 'Biometric';
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <AppHeader showNavigation />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>Admin Dashboard</Text>
-          <View style={styles.titleIcons}>
-            <View style={styles.bellCircle}>
-              <Icon color="#7CB454" name="notifications" size={20} />
-            </View>
-            <Icon color="#7CB454" name="person-circle" size={38} />
-          </View>
+const NoticeBoard = () => (
+  <View style={styles.noticeSection}>
+    <Text accessibilityRole="header" style={styles.noticeBoardTitle}>
+      Notice Board
+    </Text>
+    <View style={styles.noticeBoard}>
+      <View style={styles.noticeBoardHeading}>
+        <View style={styles.noticeIconWrap}>
+          <Icon name="megaphone-outline" size={21} color="#00633F" />
         </View>
-        <View style={styles.registerUserSection}>
-          <View style={styles.registerUserHeading}>
-            <Icon color={COLORS.darkGreen} name="person-add-outline" size={28} />
-            <Text style={styles.cardTitle}>Register User</Text>
+        <View style={styles.noticeSubjectRow}>
+          <Text style={styles.noticeSubject}>Face registration</Text>
+          <Text style={styles.newNoticeText}>NEW</Text>
+        </View>
+      </View>
+      <Text style={styles.noticeCopy}>
+        Only admins can register employee faces.
+      </Text>
+      <View style={styles.noticeFooter}>
+        <View style={styles.noticeMetaItem}>
+          <Icon name="shield-checkmark-outline" size={14} color="#52665A" />
+          <Text style={styles.noticeAuthor}>Admin announcement</Text>
+        </View>
+        <View style={styles.noticeMetaItem}>
+          <Icon name="people-outline" size={14} color="#52665A" />
+          <Text style={styles.noticeAudience}>All employees</Text>
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+class DashboardContent extends React.Component {
+  state = {
+    now: new Date(),
+    newsVisible: false,
+  };
+
+  componentDidMount() {
+    this.clockTimer = setInterval(() => this.setState({now: new Date()}), 1000);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.clockTimer);
+  }
+
+  toggleNews = () => {
+    this.setState(({newsVisible}) => ({newsVisible: !newsVisible}));
+  };
+
+  render() {
+    const {navigation} = this.props;
+    const {now, newsVisible} = this.state;
+
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <AppHeader showNavigation />
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.greetingRow}>
+            <View style={styles.rowCopy}>
+              <Text style={styles.eyebrow}>WORKSPACE</Text>
+              <Text style={styles.title}>Hello, Admin</Text>
+            </View>
+            
           </View>
-          <Text style={styles.registerUserDescription}>
-            Open registration to enroll an employee's face.
-          </Text>
+          <Text style={styles.intro}>Everything you need for today.</Text>
+
+          {/* <View style={styles.todayCard}>
+            <View pointerEvents="none" accessible={false} style={styles.bannerArt}>
+              <View style={styles.artCircle} />
+              <Icon name="calendar" size={100} color="#D4F3E3" />
+              <View style={styles.artClock}><Icon name="time-outline" size={55} color="#EEFFF5" /></View>
+            </View>
+            <Text style={styles.todayLabel}>TODAY</Text>
+            <Text style={styles.clock}>
+              {now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+            </Text>
+            <Text style={styles.date}>
+              {now.toLocaleDateString(undefined, {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'})}
+            </Text>
+          </View> */}
+
+          <View style={styles.infoCards}>
+            <View style={styles.infoCard}>
+              <View style={styles.infoIcon}><Icon name="time-outline" size={25} color="#07583C" /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.infoLabel}>Current Time</Text>
+                <Text style={styles.infoTime}>{now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</Text>
+                <Text style={styles.infoHint}>{now.toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'})}</Text>
+              </View>
+            </View>
+            <View style={styles.infoCard}>
+              <View style={styles.infoIcon}><Icon name="location" size={25} color="#07583C" /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.infoLabel}>Location</Text>
+                <Text style={styles.infoValue}>Location unavailable</Text>
+                <Text style={styles.infoHint}>Location unavailable</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.checkInSpacing}>
+            <CheckInCard faceOnly accessibilityLabel="Face Check In" onPress={() => navigation.navigate(ROUTES.FACE_CHECK_IN_TEST)} />
+          </View>
+
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Register"
             onPress={() => navigation.navigate(ROUTES.REGISTER)}
-            style={({pressed}) => [
-              styles.registerUserButton,
-              pressed && styles.registerUserButtonPressed,
-            ]}>
-            <Text style={styles.registerUserButtonText}>Register User</Text>
-            <Icon color={COLORS.white} name="arrow-forward" size={20} />
+            style={({pressed}) => [styles.compactRegister, pressed && styles.registerUserButtonPressed]}>
+            <View style={styles.expandIcon}><Icon name="person-add-outline" size={25} color="#07583C" /></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.expandTitle}>Register</Text>
+              <Text style={styles.rowSubtitle}>Create your account or register for attendance</Text>
+            </View>
+            <Icon name="chevron-forward" size={20} color="#07583C" />
           </Pressable>
-        </View>
-        <SegmentedTabs activeTab={activeTab} onSelect={setActiveTab} />
-        {isDayView ? <DayView /> : isBiometricView ? <BiometricView /> : <Overview />}
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
+
+          <NoticeBoard />
+
+          {/* <ExpandableCard
+            title="News & Events"
+            subtitle="Discover the latest news and upcoming events"
+            icon="calendar-outline"
+            expanded={newsVisible}
+            onToggle={this.toggleNews}>
+            <View style={styles.emptyNews}>
+              <Icon name="newspaper-outline" size={28} color="#83958B" />
+              <Text style={styles.emptyTitle}>No updates yet</Text>
+              <Text style={styles.emptyDescription}>News and upcoming events will appear here.</Text>
+            </View>
+          </ExpandableCard> */}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+}
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1, backgroundColor: COLORS.lightGreen},
-  content: {padding: 18, paddingBottom: 36},
+  checkInSpacing: {marginTop: 12},
+  greetingRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+  rowCopy: {flex: 1, minWidth: 0},
+  avatar: {width: 58, height: 58, borderRadius: 29, backgroundColor: '#DCF4E7', alignItems: 'center', justifyContent: 'center'},
+  bannerArt: {position: 'absolute', right: 12, bottom: 8, width: 130, height: 132, alignItems: 'center', justifyContent: 'center', opacity: 0.85},
+  artCircle: {position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: '#087A4E', right: -30, top: -18},
+  artClock: {position: 'absolute', bottom: 0, right: -3, backgroundColor: '#00633F', borderRadius: 32},
+  infoCards: {flexDirection: 'row', gap: 10, marginTop: 12},
+  infoCard: {flex: 1, minWidth: 0, backgroundColor: '#EAF6EF', borderRadius: 15, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9},
+  infoIcon: {width: 38, height: 42, borderRadius: 11, backgroundColor: '#D2EFDF', alignItems: 'center', justifyContent: 'center'},
+  infoLabel: {fontSize: 10, color: '#737183', fontWeight: '600', marginBottom: 3},
+  infoTime: {fontSize: 18, color: '#102D24', fontWeight: '800'},
+  infoValue: {fontSize: 11, color: '#102D24', fontWeight: '700', lineHeight: 16},
+  infoHint: {fontSize: 10, color: '#817F8D', marginTop: 4, lineHeight: 14},
+  checkInHint: {color: '#E0F5E9', fontSize: 12, lineHeight: 18, marginTop: 4},
+  checkInArrow: {width: 48, height: 48, borderRadius: 24, backgroundColor: '#D7F5E2', alignItems: 'center', justifyContent: 'center'},
+  rowSubtitle: {color: '#817F8D', fontSize: 11, lineHeight: 16, marginTop: 3},
+  safeArea: {flex: 1, backgroundColor: '#F6FBF8'},
+  content: {padding: 14, paddingBottom: 36},
+  eyebrow: {color: '#737183', fontSize: 10, fontWeight: '700', letterSpacing: 3, marginBottom: 4},
+  intro: {color: '#777487', fontSize: 14, marginTop: 6, marginBottom: 18},
+  todayCard: {backgroundColor: '#00633F', borderRadius: 17, padding: 20, minHeight: 160, justifyContent: 'center', overflow: 'hidden'},
+  sectionRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12},
+  todayLabel: {color: '#E1F6EA', fontSize: 11, fontWeight: '700', letterSpacing: 3},
+  clock: {color: COLORS.white, fontSize: 40, fontWeight: '800', marginTop: 16, fontVariant: ['tabular-nums'], zIndex: 1},
+  date: {color: '#E3EFE7', fontSize: 13, marginTop: 4, zIndex: 1},
+  locationRow: {borderTopWidth: 1, borderTopColor: '#FFFFFF30', marginTop: 20, paddingTop: 16, flexDirection: 'row', alignItems: 'center', gap: 10},
+  locationCopy: {flex: 1},
+  locationTitle: {color: COLORS.white, fontSize: 13, fontWeight: '600'},
+  locationHint: {color: '#D3E7DA', fontSize: 12, marginTop: 3},
+  checkInButton: {backgroundColor: '#008250', borderRadius: 17, minHeight: 108, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 12, overflow: 'hidden'},
+  checkInInner: {width: '100%', height: '100%', borderRadius: 70, borderWidth: 1, borderColor: '#FFFFFF45', alignItems: 'center', justifyContent: 'center', gap: 8},
+  checkInText: {color: COLORS.white, fontSize: 24, fontWeight: '800'},
+  compactRegister: {flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 76, padding: 12, borderRadius: 17, backgroundColor: '#EDF7F2', borderWidth: 1, borderColor: '#E0EEE7', marginTop: 12},
+  registerLabel: {color: COLORS.darkGreen, fontSize: 13, fontWeight: '700'},
+  expandHeader: {flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 76},
+  expandIcon: {width: 46, height: 46, backgroundColor: '#D7F1E3', borderRadius: 12, alignItems: 'center', justifyContent: 'center'},
+  expandTitle: {color: '#102D24', fontSize: 16, fontWeight: '700'},
+  expandBody: {paddingHorizontal: 16, paddingBottom: 16},
+  noticeSection: {marginTop: 24},
+  noticeBoardTitle: {color: '#102D24', fontSize: 17, fontWeight: '700', marginBottom: 12},
+  noticeBoard: {backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCEBE2', borderRadius: 18, padding: 18, shadowColor: '#102D24', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.04, shadowRadius: 10, elevation: 1},
+  noticeBoardHeading: {flexDirection: 'row', alignItems: 'flex-start', gap: 12},
+  noticeIconWrap: {width: 42, height: 42, borderRadius: 12, backgroundColor: '#EAF6EF', alignItems: 'center', justifyContent: 'center'},
+  newNoticeText: {color: '#00633F', backgroundColor: '#EAF6EF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, fontSize: 10, lineHeight: 14, fontWeight: '700', letterSpacing: 0.6, overflow: 'hidden'},
+  noticeSubjectRow: {flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingVertical: 8},
+  noticeSubject: {color: '#102D24', fontSize: 16, lineHeight: 23, fontWeight: '700', flexShrink: 1},
+  noticeCopy: {color: '#52665A', fontSize: 14, lineHeight: 22, marginTop: 12},
+  noticeFooter: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#EDF3EF'},
+  noticeMetaItem: {flexDirection: 'row', alignItems: 'center', gap: 5},
+  noticeAuthor: {color: '#52665A', fontSize: 11, lineHeight: 16, flexShrink: 1},
+  noticeAudience: {color: '#52665A', fontSize: 11, lineHeight: 16, flexShrink: 1},
+  quickActions: {flexDirection: 'row', gap: 12, marginTop: 16},
+  actionCard: {flex: 1, backgroundColor: COLORS.white, borderWidth: 1, borderColor: '#E3EBE6', borderRadius: 18, padding: 16},
+  actionIcon: {backgroundColor: '#EDF6EF', borderRadius: 13, width: 44, height: 44, justifyContent: 'center', alignItems: 'center', marginBottom: 14},
+  actionTitle: {color: COLORS.darkGreen, fontSize: 16, fontWeight: '700'},
+  muted: {color: '#718078', fontSize: 12, marginTop: 5, lineHeight: 18},
+  newsCard: {backgroundColor: '#14382D', borderRadius: 24, borderWidth: 1, borderColor: '#244C3C', overflow: 'hidden', marginTop: 18},
+  emptyNews: {alignItems: 'center', paddingVertical: 24, paddingHorizontal: 12},
+  emptyTitle: {color: '#52665A', fontSize: 14, fontWeight: '600', marginTop: 12},
+  emptyDescription: {color: '#718078', fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 6},
+  modalBackdrop: {flex: 1, backgroundColor: '#102C1766', justifyContent: 'center', padding: 24},
+  noticeCard: {backgroundColor: COLORS.white, borderRadius: 20, padding: 24},
+  noticeText: {color: '#52665A', fontSize: 13, lineHeight: 21, marginTop: 8},
   registerUserSection: {backgroundColor: COLORS.white, borderColor: COLORS.primary, borderRadius: 14, borderWidth: 1, marginTop: 20, padding: 18},
   registerUserHeading: {alignItems: 'center', flexDirection: 'row', gap: 10},
   registerUserDescription: {color: '#667085', fontSize: 14, lineHeight: 20, marginTop: 10},
@@ -265,7 +426,7 @@ const styles = StyleSheet.create({
   registerUserButtonPressed: {opacity: 0.8},
   registerUserButtonText: {color: COLORS.white, fontSize: 16, fontWeight: '700'},
   titleRow: {alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between'},
-  title: {color: COLORS.darkGreen, fontSize: 24, fontWeight: '800'},
+  title: {color: '#082B22', fontSize: 27, fontWeight: '800'},
   titleIcons: {alignItems: 'center', flexDirection: 'row', gap: 12},
   bellCircle: {alignItems: 'center', borderColor: COLORS.primary, borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36},
   tabs: {borderColor: COLORS.darkGreen, borderRadius: 8, borderWidth: 1, flexDirection: 'row', marginTop: 14, overflow: 'hidden'},
@@ -338,4 +499,7 @@ const styles = StyleSheet.create({
   registrationButtonText: {color: COLORS.white, fontSize: 11, fontWeight: '800', marginLeft: 5},
 });
 
-export default AdminDashboardScreen;
+// Keep the navigation entry a function; React mounts the stateful class as a child.
+const AdminDashboardRoute = props => <DashboardContent {...props} />;
+
+export default AdminDashboardRoute;

@@ -9,7 +9,7 @@ import RegisterScreen from '../src/screens/Register/RegisterScreen';
 
 jest.mock('../src/components/AppHeader', () => 'AppHeader');
 
-test('opens Login after the splash delay', async () => {
+test('opens Admin Login after the splash delay', async () => {
   jest.useFakeTimers();
   const navigation = {replace: jest.fn()};
   let renderer: ReactTestRenderer.ReactTestRenderer;
@@ -21,7 +21,7 @@ test('opens Login after the splash delay', async () => {
     jest.advanceTimersByTime(1500);
   });
 
-  expect(navigation.replace).toHaveBeenCalledWith('Login');
+  expect(navigation.replace).toHaveBeenCalledWith('AdminLogin');
 
   await ReactTestRenderer.act(async () => {
     renderer!.unmount();

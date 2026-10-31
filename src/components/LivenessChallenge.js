@@ -1,6 +1,5 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-
 import {getLivenessInstruction} from '../services/livenessService';
 
 const LivenessChallenge = ({captureCountdown, challenge, currentIndex, hasManualCaptureOption = false}) => {
