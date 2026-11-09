@@ -1,67 +1,85 @@
 import React from 'react';
-import {Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 import AppHeader from '../../components/AppHeader';
 import CheckInCard from '../../components/CheckInCard';
-import {ROUTES} from '../../constants/routes';
+import { ROUTES } from '../../constants/routes';
 
-const RegisterOption = ({image, label, accessibilityLabel, onPress}) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityLabel={accessibilityLabel}
-    onPress={onPress}
-    style={({pressed}) => [styles.optionWrapper, pressed && styles.pressed]}>
-    <View style={styles.optionCard}>
-      <Image resizeMode="contain" source={image} style={styles.optionImage} />
+const AssignmentField = ({ label, placeholder, required, dropdown }) => (
+  <View style={styles.field}>
+    <Text style={styles.fieldLabel}>
+      {label}
+      {required && <Text style={styles.required}> *</Text>}
+    </Text>
+    <View style={styles.fieldInput}>
+      <Text style={styles.placeholder}>{placeholder}</Text>
+      {dropdown && <Icon name="chevron-down" size={18} color="#75827A" />}
     </View>
-    <Text style={styles.optionLabel}>{label}</Text>
-  </Pressable>
+  </View>
 );
 
-const RegisterScreen = ({navigation}) => (
+const RegisterScreen = ({ navigation }) => (
   <SafeAreaView style={styles.safeArea}>
     <AppHeader />
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Go back"
         hitSlop={10}
         onPress={() => navigation.goBack()}
-        style={styles.backButton}>
+        style={styles.backButton}
+      >
         <Icon name="arrow-back" size={20} color="#07583C" />
         <Text style={styles.backText}>Back</Text>
       </Pressable>
-      <Text accessibilityRole="header" style={styles.title}>Register</Text>
-      <Text style={styles.subtitle}>Choose a biometric method to get started.</Text>
 
-      <View style={styles.registrationPanel}>
-        <Image
-          accessibilityLabel="Face registration"
-          resizeMode="contain"
-          source={require('../../assets/FaceID.png')}
-          style={styles.heroImage}
+      <Text style={styles.title}>Register employees</Text>
+
+      <View style={styles.card}>
+        <AssignmentField
+          label="Select Employees Tyep"
+          placeholder="Employees Tyep"
+          required
+          dropdown
         />
-        <Text style={styles.panelTitle}>Biometric Registration</Text>
-        <Text style={styles.panelSubtitle}>A simple, secure way to mark attendance.</Text>
-        <View style={styles.options}>
-          <RegisterOption
-            image={require('../../assets/face.png')}
-            label="Facial Recognition"
-            accessibilityLabel="Face Register"
-            onPress={() => navigation.navigate(ROUTES.ENROLLMENT_IDENTITY)}
-          />
-          <RegisterOption
-            image={require('../../assets/finger.png')}
-            label="Fingerprint"
-            accessibilityLabel="Fingerprint Register"
-            onPress={() => Alert.alert('Fingerprint registration', 'Fingerprint registration is not available yet.')}
-          />
-        </View>
-        <View style={styles.adminNotice}>
-          <Icon name="shield-checkmark-outline" size={15} color="#47715A" />
-          <Text style={styles.adminNoticeText}>Only admins can register employee faces.</Text>
-        </View>
+        <AssignmentField
+          label="Select Branch"
+          placeholder="Select Branch"
+          required
+          dropdown
+        />
+        <AssignmentField
+          label="Select Department"
+          placeholder="Select Department"
+          dropdown
+        />
+        <AssignmentField
+          label="Select Designation"
+          placeholder="Select Designation"
+          dropdown
+        />
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: true }}
+          disabled
+          style={styles.saveButton}
+        >
+          <Icon name="save-outline" size={17} color="#FFFFFF" />
+          <Text style={styles.saveText}>View Employee </Text>
+        </Pressable>
+        <Text style={styles.formHint}>View All employees</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Already registered?</Text>
@@ -74,25 +92,127 @@ const RegisterScreen = ({navigation}) => (
 );
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1, backgroundColor: '#F6FBF8'},
-  content: {flexGrow: 1, padding: 18, paddingBottom: 32, width: '100%', maxWidth: 600, alignSelf: 'center'},
-  backButton: {flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6, marginBottom: 16},
-  backText: {color: '#07583C', fontSize: 13, fontWeight: '500'},
-  title: {color: '#0A3425', fontSize: 28, fontWeight: '800'},
-  subtitle: {color: '#718078', fontSize: 13, lineHeight: 20, marginTop: 6, marginBottom: 22},
-  registrationPanel: {backgroundColor: '#F0FFF1', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 24, alignItems: 'center'},
-  heroImage: {height: 118, width: 140, marginBottom: 16},
-  panelTitle: {color: '#0A3425', fontSize: 19, fontWeight: '700', textAlign: 'center'},
-  panelSubtitle: {color: '#718078', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 6},
-  options: {flexDirection: 'row', gap: 20, justifyContent: 'center', marginTop: 26, width: '100%'},
-  optionWrapper: {alignItems: 'center', flex: 1, maxWidth: 150},
-  optionCard: {alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#06C168', borderRadius: 16, borderWidth: 1, height: 100, justifyContent: 'center', width: '100%'},
-  optionImage: {height: 78, width: '90%'},
-  optionLabel: {color: '#00A854', fontSize: 12, fontWeight: '500', lineHeight: 18, marginTop: 9, textAlign: 'center'},
-  adminNotice: {flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 24},
-  adminNoticeText: {color: '#47715A', fontSize: 10, lineHeight: 16, flexShrink: 1},
-  sectionTitle: {color: '#426050', fontSize: 13, fontWeight: '600', marginTop: 26, marginBottom: 12},
-  pressed: {opacity: 0.75},
+  safeArea: { flex: 1, backgroundColor: '#F6FBF8' },
+  content: {
+    flexGrow: 1,
+    padding: 18,
+    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  backText: { color: '#07583C', fontSize: 13, fontWeight: '500' },
+  title: { color: '#0A3425', fontSize: 25, fontWeight: '800' , marginBottom: 5},
+  subtitle: {
+    color: '#718078',
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DFEEE5',
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+  },
+  cardHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 22,
+  },
+  iconContainer: {
+    width: 43,
+    height: 43,
+    borderRadius: 13,
+    backgroundColor: '#EAF7EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headingCopy: { flex: 1 },
+  cardTitle: { color: '#153C2D', fontSize: 17, fontWeight: '800' },
+  cardSubtitle: {
+    color: '#788A80',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  field: { marginBottom: 16 },
+  fieldLabel: {
+    color: '#344D40',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  required: { color: '#DC5959' },
+  fieldInput: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D6E3DA',
+    backgroundColor: '#FAFCFA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  placeholder: { color: '#89978F', fontSize: 13 },
+  saveButton: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#8EB9A2',
+    borderRadius: 9,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  saveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  formHint: { color: '#788A80', fontSize: 11, marginTop: 10 },
+  sectionTitle: {
+    color: '#426050',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 25,
+    marginBottom: 12,
+  },
+  actionCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DFEEE5',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#EAF7EF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionTitle: { color: '#153C2D', fontSize: 15, fontWeight: '800' },
+  actionSubtitle: {
+    color: '#788A80',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  pressed: { opacity: 0.75 },
 });
 
 export default RegisterScreen;
