@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Your location is used to show the nearest workplace.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is required to register and verify your face for attendance.</string>
 	<key>RCTNewArchEnabled</key>

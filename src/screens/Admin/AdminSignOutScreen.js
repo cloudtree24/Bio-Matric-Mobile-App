@@ -8,10 +8,11 @@ import {ROUTES} from '../../constants/routes';
 import {useAdminSession} from '../../context/AdminSessionContext';
 
 const AdminSignOutScreen = ({navigation}) => {
-  const {setIsAdminLoggedIn} = useAdminSession();
+  const {setIsAdminLoggedIn, setGeofences} = useAdminSession();
 
   const handleSignOut = () => {
     setIsAdminLoggedIn(false);
+    setGeofences([]);
     navigation.reset({index: 0, routes: [{name: ROUTES.ADMIN_LOGIN}]});
   };
 

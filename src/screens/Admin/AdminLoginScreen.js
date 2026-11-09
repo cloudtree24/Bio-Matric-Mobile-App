@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
+import Icon from 'react-native-vector-icons/Ionicons';
 import {
   Alert,
   Image,
@@ -11,30 +12,62 @@ import {
   View,
 } from 'react-native';
 
-import {COLORS} from '../../constants/colors';
-import {ROUTES} from '../../constants/routes';
+import { COLORS } from '../../constants/colors';
+import { ROUTES } from '../../constants/routes';
 import AppHeader from '../../components/AppHeader';
-import {useAdminSession} from '../../context/AdminSessionContext';
-const ADMIN_PIN = '1234';
+import { useAdminSession } from '../../context/AdminSessionContext';
+import apiClient from '../../services/apiClient';
 
-const AdminLoginScreen = ({navigation}) => {
-  const {setIsAdminLoggedIn} = useAdminSession();
+const AdminLoginScreen = ({ navigation }) => {
+  const { setIsAdminLoggedIn, setGeofences } = useAdminSession();
   const [userId, setUserId] = useState('');
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!userId.trim()) {
-      Alert.alert('User ID required', 'Please enter your user ID.');
+// debugger
+
+  const handleLogin = async () => {
+    if (!userId.trim() || !password) {
+      Alert.alert(
+        'Credentials required',
+        'Please enter your user name and password.',
+      );
       return;
     }
 
-    if (pin !== ADMIN_PIN) {
-      Alert.alert('Invalid PIN', 'Enter the correct 4-digit PIN.');
+    if (isLoading) {
       return;
     }
 
-    setIsAdminLoggedIn(true);
-    navigation.replace(ROUTES.ADMIN_DASHBOARD);
+    setIsLoading(true);
+    try {
+      const { data } = await apiClient.post(
+        '/EmpRegistration/GeoLocationAdminLogin',
+        {
+          UserName: userId.trim(),
+          Password: password,
+        },
+      );
+
+      console.log('Admin login response:', data);
+
+      if (data?.response?.isSuccess !== true) {
+        Alert.alert(
+          'Login failed',
+          data?.response?.message || 'Invalid user name or password.',
+        );
+        return;
+      }
+
+      setGeofences(Array.isArray(data.geofences) ? data.geofences : []);
+      setIsAdminLoggedIn(true);
+      navigation.replace(ROUTES.ADMIN_DASHBOARD);
+    } catch (error) {
+      Alert.alert('Login failed', error.message || 'Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,32 +88,49 @@ const AdminLoginScreen = ({navigation}) => {
         <View style={styles.content}>
           <Text style={styles.title}>Admin Login</Text>
           <Text style={styles.subtitle}>
-            Enter your user ID and PIN to continue.
+            Enter your user name and password to continue.
           </Text>
           <TextInput
             autoCapitalize="none"
             onChangeText={setUserId}
-            placeholder="User ID"
+            placeholder="User name"
             placeholderTextColor="#6B7280"
             style={styles.input}
             value={userId}
           />
-          <TextInput
-            keyboardType="number-pad"
-            maxLength={4}
-            onChangeText={setPin}
-            placeholder="4-digit PIN"
-            placeholderTextColor="#6B7280"
-            secureTextEntry
-            style={styles.input}
-            value={pin}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor="#6B7280"
+              secureTextEntry={!showPassword}
+              style={styles.passwordInput}
+              value={password}
+            />
+            <Pressable
+              accessibilityLabel={
+                showPassword ? 'Hide password' : 'Show password'
+              }
+              accessibilityRole="button"
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeButton}
+            >
+              <Icon
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={24}
+                color={COLORS.darkGreen}
+              />
+            </Pressable>
+          </View>
           <Pressable
             accessibilityRole="button"
+            disabled={isLoading}
             onPress={handleLogin}
             style={styles.button}
           >
-            <Text style={styles.buttonText}>Login</Text>
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Logging in...' : 'Login'}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -90,7 +140,7 @@ const AdminLoginScreen = ({navigation}) => {
 
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: COLORS.lightGreen, flex: 1 },
-  content: { flex: 1, justifyContent: 'center', padding: 24 , marginTop: 24},
+  content: { flex: 1, justifyContent: 'center', padding: 24, marginTop: 24 },
   title: { color: COLORS.darkGreen, fontSize: 28, fontWeight: '800' },
   subtitle: {
     color: COLORS.darkGreen,
@@ -109,6 +159,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
+  passwordContainer: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.primary,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  passwordInput: {
+    color: COLORS.darkGreen,
+    flex: 1,
+    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  eyeButton: { paddingHorizontal: 14, paddingVertical: 12 },
   heroImage: {
     height: 180,
     maxWidth: 440,

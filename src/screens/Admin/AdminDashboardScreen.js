@@ -1,7 +1,10 @@
 // @refresh reset
 // Remount this screen during Fast Refresh when its dashboard hooks change.
-import React from 'react';
+import React, {useEffect, useState} from 'react';
+import Geolocation from '@react-native-community/geolocation';
 import {
+  PermissionsAndroid,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,6 +17,8 @@ import CheckInCard from '../../components/CheckInCard';
 import AppHeader from '../../components/AppHeader';
 import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
+import {useAdminSession} from '../../context/AdminSessionContext';
+import {findNearestGeofence} from '../../utils/nearestGeofence';
 
 const TABS = ['OverView', 'Day', 'Biometric'];
 
@@ -264,7 +269,7 @@ class DashboardContent extends React.Component {
   };
 
   render() {
-    const {navigation} = this.props;
+    const {navigation, location} = this.props;
     const {now, newsVisible} = this.state;
 
     return (
@@ -311,8 +316,8 @@ class DashboardContent extends React.Component {
               <View style={styles.infoIcon}><Icon name="location" size={25} color="#07583C" /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.infoLabel}>Location</Text>
-                <Text style={styles.infoValue}>Location unavailable</Text>
-                <Text style={styles.infoHint}>Location unavailable</Text>
+                <Text style={styles.infoValue}>{location.title}</Text>
+                <Text style={styles.infoHint}>{location.hint}</Text>
               </View>
             </View>
           </View>
@@ -500,6 +505,46 @@ const styles = StyleSheet.create({
 });
 
 // Keep the navigation entry a function; React mounts the stateful class as a child.
-const AdminDashboardRoute = props => <DashboardContent {...props} />;
+const AdminDashboardRoute = props => {
+  const {geofences} = useAdminSession();
+  const [location, setLocation] = useState({title: 'Finding location...', hint: 'Please wait'});
+
+  useEffect(() => {
+    let active = true;
+    const update = value => { if (active) { setLocation(value); } };
+    const loadLocation = async () => {
+      if (!geofences.length) {
+        update({title: 'Location unavailable', hint: 'No workplaces available.'});
+        return;
+      }
+      try {
+        if (Platform.OS === 'android') {
+          const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+          if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+            update({title: 'Location unavailable', hint: 'Location permission is needed.'});
+            return;
+          }
+        }
+        if (!active) { return; }
+        Geolocation.getCurrentPosition(
+          ({coords}) => {
+            const nearest = findNearestGeofence(coords, geofences);
+            update(nearest
+              ? {title: nearest.geoLocationName || 'Nearest workplace', hint: nearest.address || 'Address unavailable'}
+              : {title: 'Location unavailable', hint: 'No valid workplace locations.'});
+          },
+          error => update({title: 'Location unavailable', hint: error.code === 1 ? 'Location permission is needed.' : 'Check location settings and try again.'}),
+          {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
+        );
+      } catch (error) {
+        update({title: 'Location unavailable', hint: 'Check location settings and try again.'});
+      }
+    };
+    loadLocation();
+    return () => { active = false; };
+  }, [geofences]);
+
+  return <DashboardContent {...props} location={location} />;
+};
 
 export default AdminDashboardRoute;
