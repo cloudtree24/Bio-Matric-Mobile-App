@@ -3,17 +3,20 @@ import {Image, SafeAreaView, StyleSheet, View} from 'react-native';
 
 import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
+import {useAdminSession} from '../../context/AdminSessionContext';
 
 const SPLASH_DURATION_MS = 1500;
 
 const SplashScreen = ({navigation}) => {
+  const {isAdminLoggedIn, isSessionLoading} = useAdminSession();
   useEffect(() => {
+    if (isSessionLoading) { return; }
     const timeoutId = setTimeout(() => {
-      navigation.replace(ROUTES.ADMIN_LOGIN);
+      navigation.replace(isAdminLoggedIn ? ROUTES.ADMIN_DASHBOARD : ROUTES.ADMIN_LOGIN);
     }, SPLASH_DURATION_MS);
 
     return () => clearTimeout(timeoutId);
-  }, [navigation]);
+  }, [navigation, isAdminLoggedIn, isSessionLoading]);
 
   return (
     <SafeAreaView style={styles.safeArea}>

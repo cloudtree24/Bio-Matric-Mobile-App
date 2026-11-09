@@ -19,7 +19,7 @@ import { useAdminSession } from '../../context/AdminSessionContext';
 import apiClient from '../../services/apiClient';
 
 const AdminLoginScreen = ({ navigation }) => {
-  const { setIsAdminLoggedIn, setGeofences } = useAdminSession();
+  const { signIn } = useAdminSession();
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -60,8 +60,7 @@ const AdminLoginScreen = ({ navigation }) => {
         return;
       }
 
-      setGeofences(Array.isArray(data.geofences) ? data.geofences : []);
-      setIsAdminLoggedIn(true);
+      await signIn(data.geofences);
       navigation.replace(ROUTES.ADMIN_DASHBOARD);
     } catch (error) {
       Alert.alert('Login failed', error.message || 'Please try again.');

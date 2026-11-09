@@ -1,7 +1,6 @@
 // @refresh reset
 // Remount this screen during Fast Refresh when its dashboard hooks change.
-import React, {useEffect, useState} from 'react';
-import Geolocation from '@react-native-community/geolocation';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   PermissionsAndroid,
   Platform,
@@ -19,6 +18,7 @@ import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
 import {useAdminSession} from '../../context/AdminSessionContext';
 import {findNearestGeofence} from '../../utils/nearestGeofence';
+import {getCurrentDeviceLocation} from '../../services/deviceLocation';
 
 const TABS = ['OverView', 'Day', 'Biometric'];
 
@@ -269,7 +269,7 @@ class DashboardContent extends React.Component {
   };
 
   render() {
-    const {navigation, location} = this.props;
+    const {navigation, location, onFetchLocation, isFetchingLocation} = this.props;
     const {now, newsVisible} = this.state;
 
     return (
@@ -304,20 +304,27 @@ class DashboardContent extends React.Component {
           </View> */}
 
           <View style={styles.infoCards}>
-            <View style={styles.infoCard}>
+            {/* <View style={styles.infoCard}>
               <View style={styles.infoIcon}><Icon name="time-outline" size={25} color="#07583C" /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.infoLabel}>Current Time</Text>
                 <Text style={styles.infoTime}>{now.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</Text>
                 <Text style={styles.infoHint}>{now.toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'})}</Text>
               </View>
-            </View>
+            </View> */}
             <View style={styles.infoCard}>
               <View style={styles.infoIcon}><Icon name="location" size={25} color="#07583C" /></View>
               <View style={styles.rowCopy}>
                 <Text style={styles.infoLabel}>Location</Text>
                 <Text style={styles.infoValue}>{location.title}</Text>
                 <Text style={styles.infoHint}>{location.hint}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Fetch nearest location"
+                  disabled={isFetchingLocation}
+                  onPress={onFetchLocation}>
+                  <Text style={styles.fetchLocationText}>{isFetchingLocation ? 'Fetching...' : 'Fetch location'}</Text>
+                </Pressable>
               </View>
             </View>
           </View>
@@ -374,6 +381,7 @@ const styles = StyleSheet.create({
   infoTime: {fontSize: 18, color: '#102D24', fontWeight: '800'},
   infoValue: {fontSize: 11, color: '#102D24', fontWeight: '700', lineHeight: 16},
   infoHint: {fontSize: 10, color: '#817F8D', marginTop: 4, lineHeight: 14},
+  fetchLocationText: {color: COLORS.darkGreen, fontSize: 11, fontWeight: '700', marginTop: 8},
   checkInHint: {color: '#E0F5E9', fontSize: 12, lineHeight: 18, marginTop: 4},
   checkInArrow: {width: 48, height: 48, borderRadius: 24, backgroundColor: '#D7F5E2', alignItems: 'center', justifyContent: 'center'},
   rowSubtitle: {color: '#817F8D', fontSize: 11, lineHeight: 16, marginTop: 3},
@@ -506,45 +514,68 @@ const styles = StyleSheet.create({
 
 // Keep the navigation entry a function; React mounts the stateful class as a child.
 const AdminDashboardRoute = props => {
-  const {geofences} = useAdminSession();
-  const [location, setLocation] = useState({title: 'Finding location...', hint: 'Please wait'});
+  const {geofences, nearestLocation, saveNearestLocation} = useAdminSession();
+  const savedLocationRef = useRef(nearestLocation);
+  savedLocationRef.current = nearestLocation;
+  const [location, setLocation] = useState(() => nearestLocation
+    ? {title: nearestLocation.geoLocationName || 'Nearest workplace', hint: nearestLocation.address || 'Address unavailable'}
+    : {title: 'Finding location...', hint: 'Please wait'});
+  const [fetchCount, setFetchCount] = useState(0);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(true);
 
   useEffect(() => {
     let active = true;
-    const update = value => { if (active) { setLocation(value); } };
+    const update = value => { if (active) { setLocation(value); setIsFetchingLocation(false); } };
+    const showLocationError = message => {
+      const saved = savedLocationRef.current;
+      update(saved
+        ? {title: `${saved.geoLocationName || 'Nearest workplace'} (saved)`, hint: `${saved.address || 'Address unavailable'}\n${message}`}
+        : {title: 'Location unavailable', hint: message});
+    };
     const loadLocation = async () => {
+      setIsFetchingLocation(true);
+      if (!savedLocationRef.current) { setLocation({title: 'Finding location...', hint: 'Please wait'}); }
       if (!geofences.length) {
         update({title: 'Location unavailable', hint: 'No workplaces available.'});
         return;
       }
       try {
         if (Platform.OS === 'android') {
-          const permission = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
-          if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
-            update({title: 'Location unavailable', hint: 'Location permission is needed.'});
+          const permissions = await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+          ]);
+          if (permissions[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED &&
+              permissions[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION] !== PermissionsAndroid.RESULTS.GRANTED) {
+            showLocationError('Location permission is needed.');
             return;
           }
         }
         if (!active) { return; }
-        Geolocation.getCurrentPosition(
-          ({coords}) => {
+        const {coords} = await getCurrentDeviceLocation();
+        if (active) {
             const nearest = findNearestGeofence(coords, geofences);
-            update(nearest
-              ? {title: nearest.geoLocationName || 'Nearest workplace', hint: nearest.address || 'Address unavailable'}
-              : {title: 'Location unavailable', hint: 'No valid workplace locations.'});
-          },
-          error => update({title: 'Location unavailable', hint: error.code === 1 ? 'Location permission is needed.' : 'Check location settings and try again.'}),
-          {enableHighAccuracy: true, timeout: 15000, maximumAge: 60000},
-        );
+            if (!nearest) {
+              update({title: 'Location unavailable', hint: 'No valid workplace locations.'});
+              return;
+            }
+            if (!active) { return; }
+            try {
+              await saveNearestLocation(nearest);
+              update({title: nearest.geoLocationName || 'Nearest workplace', hint: nearest.address || 'Address unavailable'});
+            } catch (error) {
+              update({title: nearest.geoLocationName || 'Nearest workplace', hint: 'Could not save location. Try again.'});
+            }
+        }
       } catch (error) {
-        update({title: 'Location unavailable', hint: 'Check location settings and try again.'});
+        showLocationError(error.code === 1 ? 'Location permission is needed.' : 'Turn on device location and try again.');
       }
     };
     loadLocation();
     return () => { active = false; };
-  }, [geofences]);
+  }, [geofences, fetchCount, saveNearestLocation]);
 
-  return <DashboardContent {...props} location={location} />;
+  return <DashboardContent {...props} location={location} isFetchingLocation={isFetchingLocation} onFetchLocation={() => setFetchCount(count => count + 1)} />;
 };
 
 export default AdminDashboardRoute;

@@ -1,5 +1,5 @@
 import React from 'react';
-import {Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -8,12 +8,15 @@ import {ROUTES} from '../../constants/routes';
 import {useAdminSession} from '../../context/AdminSessionContext';
 
 const AdminSignOutScreen = ({navigation}) => {
-  const {setIsAdminLoggedIn, setGeofences} = useAdminSession();
+  const {signOut} = useAdminSession();
 
-  const handleSignOut = () => {
-    setIsAdminLoggedIn(false);
-    setGeofences([]);
-    navigation.reset({index: 0, routes: [{name: ROUTES.ADMIN_LOGIN}]});
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigation.reset({index: 0, routes: [{name: ROUTES.ADMIN_LOGIN}]});
+    } catch (error) {
+      Alert.alert('Sign out failed', 'Please try again.');
+    }
   };
 
   return (
