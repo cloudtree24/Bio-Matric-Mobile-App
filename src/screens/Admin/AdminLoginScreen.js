@@ -50,7 +50,6 @@ const AdminLoginScreen = ({ navigation }) => {
         },
       );
 
-      console.log('Admin login response:', data);
 
       if (data?.response?.isSuccess !== true) {
         Alert.alert(
@@ -60,7 +59,7 @@ const AdminLoginScreen = ({ navigation }) => {
         return;
       }
 
-      await signIn(data.geofences);
+      await signIn({companyId: data.companyId, geofences: data.geofences});
       navigation.replace(ROUTES.ADMIN_DASHBOARD);
     } catch (error) {
       Alert.alert('Login failed', error.message || 'Please try again.');

@@ -6,10 +6,10 @@ import {COLORS} from '../../constants/colors';
 import {ROUTES} from '../../constants/routes';
 import {useFaceRegistration} from '../../hooks/useFaceRegistration';
 
-const EnrollmentIdentityScreen = ({navigation}) => {
-  const [employeeId, setEmployeeId] = useState('');
-  const [employeeName, setEmployeeName] = useState('');
-  const [companyId, setCompanyId] = useState('');
+const EnrollmentIdentityScreen = ({navigation, route}) => {
+  const [employeeId, setEmployeeId] = useState(String(route?.params?.employeeId || ''));
+  const [employeeName, setEmployeeName] = useState(route?.params?.employeeName || '');
+  const [companyId, setCompanyId] = useState(String(route?.params?.companyId || ''));
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const {checkFaceAccess} = useFaceRegistration();

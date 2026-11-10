@@ -10,6 +10,7 @@ const AdminSessionContext = createContext({
   signIn: async () => {},
   signOut: async () => {},
   setIsAdminLoggedIn: () => {},
+  companyId: null,
   geofences: [],
   setGeofences: () => {},
   nearestLocation: null,
@@ -19,6 +20,7 @@ const AdminSessionContext = createContext({
 
 export const AdminSessionProvider = ({children}) => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [companyId, setCompanyId] = useState(null);
   const [geofences, setGeofences] = useState([]);
   const [nearestLocation, setNearestLocation] = useState(null);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
@@ -30,7 +32,7 @@ export const AdminSessionProvider = ({children}) => {
         const sessionText = await AsyncStorage.getItem(SESSION_KEY);
         if (!sessionText) { return; }
         const session = JSON.parse(sessionText);
-        if (!Array.isArray(session.geofences)) { return; }
+        if (!Array.isArray(session.geofences) || !session.companyId) { return; }
         const locationText = await AsyncStorage.getItem(NEAREST_LOCATION_KEY);
         let savedLocation = null;
         try {
@@ -39,6 +41,7 @@ export const AdminSessionProvider = ({children}) => {
           console.warn('Could not restore saved location:', error);
         }
         if (active) {
+          setCompanyId(session.companyId);
           setGeofences(session.geofences);
           setNearestLocation(savedLocation);
           setIsAdminLoggedIn(true);
@@ -53,11 +56,13 @@ export const AdminSessionProvider = ({children}) => {
     return () => { active = false; };
   }, []);
 
-  const signIn = async locations => {
+  const signIn = async ({companyId: nextCompanyId, geofences: locations}) => {
+    if (!nextCompanyId) { throw new Error('Company ID is missing from the login response.'); }
     const safeLocations = Array.isArray(locations) ? locations : [];
     await AsyncStorage.removeItem(NEAREST_LOCATION_KEY);
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({geofences: safeLocations}));
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({companyId: nextCompanyId, geofences: safeLocations}));
     setNearestLocation(null);
+    setCompanyId(nextCompanyId);
     setGeofences(safeLocations);
     setIsAdminLoggedIn(true);
   };
@@ -65,6 +70,7 @@ export const AdminSessionProvider = ({children}) => {
   const signOut = async () => {
     await AsyncStorage.removeItem(SESSION_KEY);
     setIsAdminLoggedIn(false);
+    setCompanyId(null);
     setGeofences([]);
     setNearestLocation(null);
     try {
@@ -85,7 +91,7 @@ export const AdminSessionProvider = ({children}) => {
   };
 
   return (
-    <AdminSessionContext.Provider value={{isAdminLoggedIn, isSessionLoading, signIn, signOut, setIsAdminLoggedIn, geofences, setGeofences, nearestLocation, saveNearestLocation, clearNearestLocation}}>
+    <AdminSessionContext.Provider value={{isAdminLoggedIn, isSessionLoading, signIn, signOut, setIsAdminLoggedIn, companyId, geofences, setGeofences, nearestLocation, saveNearestLocation, clearNearestLocation}}>
       {children}
     </AdminSessionContext.Provider>
   );
