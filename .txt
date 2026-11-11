@@ -1,0 +1,12 @@
+Code	Finding
+[EmployeeSubmitScreen.js](/Volumes/Seagate/hems/src/screens/Employee/EmployeeSubmitScreen.js)	Kahin import nahi ho raha aur navigator mein registered bhi nahi hai. Iska USER_SUBMIT route constant bhi unused hai.
+[localapi.js](/Volumes/Seagate/hems/src/utils/localapi.js)	App mein iska koi reference nahi mila; static sample data lagta hai.
+[employeeRegistrationApi.js](/Volumes/Seagate/hems/src/services/employeeRegistrationApi.js)	Employee type, branch, department aur designation ke chaar functions ab screen use nahi karti. Tests unhe abhi bhi use karte hain, isliye delete karte waqt tests bhi update karne honge.
+react-native-picker-select dependency	Custom dropdown lagne ke baad source code mein iska import nahi mila. Package cleanup aur native rebuild verification ke baad remove kiya ja sakta hai.
+Unreferenced images	Registersucess.png, login.png, registerfingerprint.png aur cloudtree-logo copy.jpg ke source references nahi mile. Delete se pehle native assets aur intended future use check karna chahiye.
+
+
+Face-related code: deletion se pehle decision chahiye
+- [FaceCheckIn.js](/Volumes/Seagate/hems/src/components/FaceCheckIn.js) active screen se import nahi hota. Ye [FaceApiService.js](/Volumes/Seagate/hems/src/services/FaceApiService.js) use karta hai, jo tests mein bhi hai.
+- [biometricApi.js](/Volumes/Seagate/hems/src/services/biometricApi.js) aur [biometricPayload.js](/Volumes/Seagate/hems/src/utils/biometricPayload.js) active flow mein use nahi hote, lekin unke tests hain.
+- [secureStorage.js](/Volumes/Seagate/hems/src/services/secureStorage.js) ka active import nahi mila. react-native-keychain dependency

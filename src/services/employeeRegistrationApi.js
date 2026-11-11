@@ -15,3 +15,4 @@ export const getBranches = companyId => getList(`/Branch/GetAllBranch/${id(compa
 export const getDepartments = (companyId, branchId) => getList(`/EmpRegistration/GetAllDepartmentByBranchId/${id(companyId)}/${id(branchId)}`);
 export const getDesignations = departmentId => getList(`/CompanyOrganogram/GetDesignationByDepartmentId/${id(departmentId)}`);
 export const getFilteredEmployees = (companyId, employeeTypeId, branchId, departmentId = 0, designationId = 0) => getList(`/EmpRegistration/GetEmployeeDetailsByFilter/${id(companyId)}/${id(employeeTypeId)}/${id(branchId)}/${id(departmentId)}/${id(designationId)}`);
+export const fetchEmployeeDetails = (companyId, employeeId) => getList(`/EmpRegistration/FetchEmployeeDetails/${id(companyId)}/${id(employeeId)}`);
