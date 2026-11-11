@@ -1,7 +1,7 @@
 // @refresh reset
 // Remount native camera resources when this component changes during development.
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {ActivityIndicator, AppState, Linking, Platform, Pressable, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {Buffer} from 'buffer';
 import {Camera, useCameraDevice, usePhotoOutput} from 'react-native-vision-camera';
 import {useFaceDetectorOutput} from 'react-native-vision-camera-face-detector';
@@ -30,6 +30,8 @@ const PHOTO_OUTPUT_OPTIONS = {
 
 const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComplete, onError}) => {
   const isProcessing = useRef(false);
+  const inferencePending = useRef(false);
+  const captureGeneration = useRef(0);
   const isMatched = useRef(false);
   const lastProcessedTime = useRef(0);
   const latestFaces = useRef([]);
@@ -41,6 +43,8 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
   const progressRef = useRef(createLivenessProgress(challenge));
   const livenessTimerRef = useRef(null);
   const countdownTimerRef = useRef(null);
+  const warningTimerRef = useRef(null);
+  const warningShown = useRef(false);
   const completionStartedRef = useRef(false);
   const autoCaptureStartedRef = useRef(false);
   const [faceMessage, setFaceMessage] = useState('Center one face in the guide');
@@ -50,11 +54,31 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
   const [captureCountdown, setCaptureCountdown] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [cameraFailure, setCameraFailure] = useState(null);
-  const [manualCapture, setManualCapture] = useState(false);
+  const mounted = useRef(true);
+  const foreground = useRef(AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+  const [appActive, setAppActive] = useState(foreground.current);
+  const paused = useRef(isPaused);
+  paused.current = isPaused;
+  useEffect(() => {
+    mounted.current = true;
+    const subscription = AppState.addEventListener('change', state => {
+      captureGeneration.current += 1;
+      foreground.current = state === 'active';
+      setAppActive(foreground.current);
+      latestFaces.current = [];
+    });
+    return () => { mounted.current = false; samples.current = []; sampleEmbeddings.current = []; subscription.remove(); clearTimeout(warningTimerRef.current); };
+  }, []);
   const photoOutput = usePhotoOutput(PHOTO_OUTPUT_OPTIONS);
 
   const resetLiveness = useCallback(() => {
     const nextChallenge = createLivenessChallenge();
+    samples.current = [];
+    sampleEmbeddings.current = [];
+    setSampleCount(0);
+    clearTimeout(warningTimerRef.current);
+    warningTimerRef.current = null;
+    warningShown.current = false;
     isMatched.current = false;
     completionStartedRef.current = false;
     autoCaptureStartedRef.current = false;
@@ -69,7 +93,13 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
     setAttempt(value => value + 1);
   }, []);
 
+  useEffect(() => {
+    if (appActive && !isPaused) resetLiveness();
+  }, [appActive, isPaused, resetLiveness]);
+
   const fail = useCallback(message => {
+    clearTimeout(warningTimerRef.current);
+    warningTimerRef.current = null;
     clearTimeout(livenessTimerRef.current);
     clearInterval(countdownTimerRef.current);
     setFaceMessage(message);
@@ -112,14 +142,27 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
 
   const onFacesDetected = useCallback(faces => {
     latestFaces.current = faces;
-    if (manualCapture || !['liveness', 'readyToCapture'].includes(phase) || isPaused) return;
+    if (!['liveness', 'readyToCapture'].includes(phase) || isPaused) return;
     const validation = phase === 'readyToCapture' ? validateCaptureFace(faces) : validateSingleFace(faces);
     if (!validation.isValid) {
       setFaceState('warning');
       setFaceMessage(validation.reason);
+      if (!warningTimerRef.current && !warningShown.current) {
+        warningTimerRef.current = setTimeout(() => {
+          warningTimerRef.current = null;
+          if (!mounted.current || paused.current || !foreground.current) return;
+          const currentValidation = validateSingleFace(latestFaces.current);
+          if (!currentValidation.isValid) {
+            warningShown.current = true;
+            onError?.(new Error(`${currentValidation.reason}. Position only your face inside the camera frame and try again.`));
+          }
+        }, 3000);
+      }
       return;
     }
-
+    clearTimeout(warningTimerRef.current);
+    warningTimerRef.current = null;
+    warningShown.current = false;
     setFaceState('ready');
     if (phase === 'readyToCapture') { return; }
     const nextProgress = advanceLivenessProgress(progressRef.current, validation.face);
@@ -135,11 +178,11 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
       return;
     }
     setFaceMessage('Keep your face in the guide');
-  }, [challenge.length, isPaused, manualCapture, phase]);
+  }, [challenge.length, isPaused, onError, phase]);
 
   const onDetectorError = useCallback(
-    () => { if (!manualCapture) fail('Live face detection is unavailable. Retry or use manual capture for registration.'); },
-    [fail, manualCapture],
+    () => fail('Live face detection is unavailable. Please retry.'),
+    [fail],
   );
   const detectorOutput = useFaceDetectorOutput({
     autoMode: false,
@@ -152,25 +195,33 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
     runClassifications: true,
     trackingEnabled: false,
   });
-  const outputs = useMemo(() => manualCapture ? [photoOutput] : [detectorOutput, photoOutput], [detectorOutput, manualCapture, photoOutput]);
+  const outputs = useMemo(() => [detectorOutput, photoOutput], [detectorOutput, photoOutput]);
 
   const capture = useCallback(async () => {
-    if (phase !== 'readyToCapture' || isPaused || isProcessing.current || isMatched.current) return;
+    if (phase !== 'readyToCapture' || !foreground.current || isPaused || isProcessing.current || inferencePending.current || isMatched.current) return;
     if (Date.now() - lastProcessedTime.current < FACE_CONFIG.identificationIntervalMs) return;
-    if (!manualCapture) {
-      const validation = validateCaptureFace(latestFaces.current);
-      if (!validation.isValid) { autoCaptureStartedRef.current = false; setFaceMessage(validation.reason); return; }
-    }
+    const validation = validateCaptureFace(latestFaces.current);
+    if (!validation.isValid) { autoCaptureStartedRef.current = false; setFaceMessage(validation.reason); return; }
     isProcessing.current = true;
     lastProcessedTime.current = Date.now();
     setPhase('processing');
     setFaceMessage(mode === 'registration' ? `Capturing face ${samples.current.length + 1} of 3` : 'Identifying employee');
     let photo;
+    let processingTimer;
+    const generation = captureGeneration.current;
     try {
       photo = await photoOutput.capturePhoto({flashMode: 'off'}, CAPTURE_CALLBACKS);
       const data = await photo.getFileDataAsync();
+      if (!mounted.current || paused.current || !foreground.current || generation !== captureGeneration.current) return;
       const faceImage = await cropCapturedFace(Buffer.from(data).toString('base64'));
-      const embedding = await faceRecognitionService.getEmbedding(faceImage);
+      inferencePending.current = true;
+      const inference = faceRecognitionService.getEmbedding(faceImage).finally(() => { inferencePending.current = false; });
+      const embedding = await Promise.race([
+        inference,
+        new Promise((_, reject) => { processingTimer = setTimeout(() => reject(new Error('Face processing timed out. Please try again.')), FACE_CONFIG.processingTimeoutMs); }),
+      ]);
+      clearTimeout(processingTimer);
+      if (!mounted.current || paused.current || !foreground.current || generation !== captureGeneration.current) return;
       if (mode === 'registration') {
         if (sampleEmbeddings.current.some(saved => cosineSimilarity(saved, embedding) < FACE_CONFIG.registrationConsistencyThreshold)) {
           throw new Error('Face samples must belong to the same person. Try again.');
@@ -182,6 +233,8 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
         }
         if (samples.current.length === FACE_CONFIG.registrationSampleCount) {
           await onComplete(samples.current);
+          samples.current = []; sampleEmbeddings.current = [];
+          if (!mounted.current) return;
           setFaceMessage('Registration completed');
           setPhase('completed');
         } else {
@@ -190,11 +243,13 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
         }
       } else {
         const result = await onComplete(embedding);
+        if (!mounted.current) return;
         isMatched.current = !!result?.matched;
         setFaceMessage(result?.matched ? 'Face matched' : result?.reason === 'ambiguous' ? 'Ambiguous face match. Hold still' : 'Face not recognized');
         if (!result?.matched) setPhase('readyToCapture');
       }
     } catch (error) {
+      if (!mounted.current) return;
       const captureError = error instanceof Error ? error : new Error('Could not capture the face image.');
       if (captureError.code === 'INVALID_FACE_POSE' || (mode === 'recognition' && captureError.code === 'INVALID_FACE_COUNT')) {
         setFaceMessage(captureError.message);
@@ -205,13 +260,14 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
       onError?.(captureError);
       fail(captureError.message);
     } finally {
+      clearTimeout(processingTimer);
       photo?.dispose();
       isProcessing.current = false;
     }
-  }, [fail, isPaused, manualCapture, mode, onComplete, onError, phase, photoOutput]);
+  }, [fail, isPaused, mode, onComplete, onError, phase, photoOutput]);
 
   useEffect(() => {
-    if (manualCapture || phase !== 'readyToCapture' || isPaused) return undefined;
+    if (phase !== 'readyToCapture' || isPaused || !appActive) return undefined;
 
     let secondsRemaining = mode === 'recognition' ? 0 : 1;
     const tick = () => {
@@ -227,7 +283,7 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
     countdownTimerRef.current = setInterval(tick, mode === 'recognition' ? FACE_CONFIG.identificationIntervalMs : 1000);
     tick();
     return () => clearInterval(countdownTimerRef.current);
-  }, [capture, isPaused, manualCapture, mode, phase]);
+  }, [appActive, capture, isPaused, mode, phase]);
 
   if (cameraFailure) {
     return (
@@ -249,7 +305,7 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
     <View style={styles.root}>
       <View style={styles.cameraStage}>
         <FaceGuideOverlay captureCountdown={captureCountdown} faceState={faceState} message={faceMessage}>
-          <Camera device={device} isActive={!isPaused} onError={handleCameraError} outputs={outputs} resizeMode="cover" style={StyleSheet.absoluteFill} />
+          <Camera device={device} isActive={!isPaused && appActive} onError={handleCameraError} outputs={outputs} resizeMode="cover" style={StyleSheet.absoluteFill} />
         </FaceGuideOverlay>
       </View>
       {/* <SafeAreaView style={styles.headerSafeArea}>
@@ -260,31 +316,17 @@ const FaceCamera = ({isPaused = false, mode = 'registration', onCancel, onComple
           </Pressable>
         </View>
       </SafeAreaView> */}
-      {!manualCapture && <LivenessChallenge captureCountdown={captureCountdown} challenge={challenge} currentIndex={challengeIndex} hasManualCaptureOption={mode === 'registration'} />}
+      <LivenessChallenge captureCountdown={captureCountdown} challenge={challenge} currentIndex={challengeIndex} hasManualCaptureOption={false} />
       {phase === 'processing' && <View style={styles.processing}><ActivityIndicator color="#FFFFFF" size="large" /><Text style={styles.processingText}>{faceMessage}</Text></View>}
 
 
       <View style={styles.actions}>
-        {mode === 'registration' && phase !== 'processing' && phase !== 'completed' && (
-          <Pressable accessibilityRole="button" onPress={() => {
-            if (isProcessing.current) return;
-            if (manualCapture) { setManualCapture(false); resetLiveness(); }
-            else {
-              clearTimeout(livenessTimerRef.current);
-              clearInterval(countdownTimerRef.current);
-              setManualCapture(true);
-              setPhase('readyToCapture');
-              setCaptureCountdown(null);
-              setFaceMessage('Manual capture: center one face, then tap Capture face. Live liveness checks are skipped.');
-            }
-          }} style={styles.manualToggle}><Text style={styles.captureText}>{manualCapture ? 'Use automatic capture' : 'Use manual capture'}</Text></Pressable>
-        )}
-        {manualCapture && phase === 'readyToCapture' ? (
+        {phase === 'readyToCapture' ? (
           <Pressable accessibilityRole="button" disabled={isPaused} onPress={capture} style={styles.captureButton}><Text style={styles.captureText}>Capture face {sampleCount + 1} of {FACE_CONFIG.registrationSampleCount}</Text></Pressable>
         ) : phase === 'readyToCapture' ? (
           <View style={styles.countdownAction}><Icon color="#FFFFFF" name="shield-checkmark" size={20} /><Text style={styles.captureText}>{mode === 'registration' ? `Capturing face ${Math.min(sampleCount + 1, 3)} of 3` : 'Identifying employee'}</Text></View>
         ) : phase === 'error' ? (
-          <Pressable accessibilityRole="button" onPress={() => { if (manualCapture) { setPhase('readyToCapture'); setFaceMessage('Center one face and tap Capture face.'); } else resetLiveness(); }} style={styles.captureButton}><Text style={styles.captureText}>Try again</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={resetLiveness} style={styles.captureButton}><Text style={styles.captureText}>Try again</Text></Pressable>
         ) : (
           <View style={styles.statusButton}><Text style={styles.statusText}>{phase === 'processing' ? 'Please wait' : 'Follow the security check'}</Text></View>
         )}

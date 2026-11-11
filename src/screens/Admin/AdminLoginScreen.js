@@ -59,7 +59,11 @@ const AdminLoginScreen = ({ navigation }) => {
         return;
       }
 
-      await signIn({companyId: data.companyId, geofences: data.geofences});
+      await signIn({
+        companyId: data.companyId, geofences: data.geofences,
+        employeeId: data.employeeId ?? null,
+        operatorId: data.adminId ?? null,
+      });
       navigation.replace(ROUTES.ADMIN_DASHBOARD);
     } catch (error) {
       Alert.alert('Login failed', error.message || 'Please try again.');

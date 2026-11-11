@@ -35,3 +35,24 @@ describe('biometric API client', () => {
     );
   });
 });
+
+describe('backend biometric retrieval', () => {
+  const {getRegisteredBiometric} = require('../src/services/biometricApi');
+  const record = {employeeId: 10, companyId: 1, faceImage: 'a'.repeat(32), faceEmbeding: 'embedding', isDelete: 0};
+  test('preserves embedding and uses employee/company route order', async () => {
+    apiClient.get.mockResolvedValue({data: record});
+    await expect(getRegisteredBiometric(10, 1)).resolves.toEqual(record);
+    expect(apiClient.get).toHaveBeenLastCalledWith('/EmployeeBiomatricRegister/getEmployeeBiomatricDetailsByString/10/1');
+  });
+  test.each([null, [], {}, {...record, isDelete: 1}, {...record, faceImage: '', faceEmbeding: ''}])('recognizes missing or deleted registrations', async data => {
+    apiClient.get.mockResolvedValue({data});
+    await expect(getRegisteredBiometric(10, 1)).resolves.toBeNull();
+  });
+  test.each([{...record, employeeId: 11}, {...record, companyId: 2}, [record, record], 'invalid'])('rejects wrong identity or ambiguous response', async data => {
+    apiClient.get.mockResolvedValue({data});
+    await expect(getRegisteredBiometric(10, 1)).rejects.toThrow();
+  });
+  test('rejects display codes in numeric biometric routes', async () => {
+    await expect(getRegisteredBiometric('AA_11', 1)).rejects.toThrow('Employee ID');
+  });
+});

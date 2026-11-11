@@ -5,6 +5,7 @@ import {Buffer} from 'buffer';
 import jpeg from 'jpeg-js';
 import {stripDataUriPrefix} from '../utils/base64';
 import {validateCaptureFace, validateSingleFace} from '../utils/faceValidation';
+import {validateFaceImageQuality} from '../utils/faceImageQuality';
 import {FACE_CONFIG} from '../config/faceConfig';
 
 let detector;
@@ -35,12 +36,13 @@ export const cropCapturedFace = async imageBase64 => {
     const bottom = Math.min(decoded.height, Math.ceil(y + height));
     const cropWidth = right - left;
     const cropHeight = bottom - top;
-    if (cropWidth <= 0 || cropHeight <= 0) throw new Error('Face is outside the captured image.');
+    if (cropWidth <= 0 || cropHeight <= 0 || cropWidth < width * 0.95 || cropHeight < height * 0.95) throw new Error('Position your entire face inside the camera frame.');
     const pixels = new Uint8Array(cropWidth * cropHeight * 4);
     for (let row = 0; row < cropHeight; row += 1) {
       const start = ((top + row) * decoded.width + left) * 4;
       pixels.set(decoded.data.subarray(start, start + cropWidth * 4), row * cropWidth * 4);
     }
+    validateFaceImageQuality({data: pixels, width: cropWidth, height: cropHeight});
     if (__DEV__) console.info('[face-capture] Face detected', {width: cropWidth, height: cropHeight});
     return Buffer.from(jpeg.encode({data: pixels, width: cropWidth, height: cropHeight}, 100).data).toString('base64');
   } finally {

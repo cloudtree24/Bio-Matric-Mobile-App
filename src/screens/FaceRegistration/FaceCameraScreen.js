@@ -1,81 +1,94 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
-
+// @refresh reset
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {ActivityIndicator, SafeAreaView, StyleSheet, Text, View} from 'react-native';
+import {useIsFocused} from '@react-navigation/native';
 import FaceCamera from '../../components/FaceCamera';
-import {ROUTES} from '../../constants/routes';
+import FaceStatusModal from '../../components/FaceStatusModal';
+import {useAdminSession} from '../../context/AdminSessionContext';
 import {useCameraPermission} from '../../hooks/useCameraPermission';
 import {useFaceRegistration} from '../../hooks/useFaceRegistration';
+import {getRegisteredBiometric} from '../../services/biometricApi';
+import {decodeBackendEmbedding} from '../../services/backendFaceService';
 import faceRecognitionService from '../../services/faceRecognitionService';
 
 const FaceCameraScreen = ({navigation, route}) => {
   const {employeeId, employeeName, companyId} = route.params || {};
+  const originCompanyId = route.params?.sessionCompanyId ?? companyId;
+  const {operatorId, companyId: sessionCompanyId} = useAdminSession();
+  const focused = useIsFocused();
   const {cameraPermissionStatus, requestCameraPermission} = useCameraPermission();
-  const {registerFace} = useFaceRegistration();
-  const [isPreparing, setIsPreparing] = useState(true);
-  const [preparationError, setPreparationError] = useState('');
-  const [cameraError, setCameraError] = useState('');
+  const {registerFace, checkFaceAccess} = useFaceRegistration();
+  const [preparing, setPreparing] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+  const active = useRef(false);
+  const sessionVersion = useRef(0);
+  const submitting = useRef(false);
+  const saved = useRef(false);
+  const photoSamples = useRef(null);
+  useEffect(() => {
+    sessionVersion.current += 1;
+    active.current = focused;
+    return () => { active.current = false; photoSamples.current = null; };
+  }, [focused, companyId, sessionCompanyId]);
 
   useEffect(() => {
-    let isMounted = true;
+    let current = true;
     const prepare = async () => {
-      if (!employeeId || !companyId) {
-        if (isMounted) setPreparationError('Registration identity is missing. Start again.');
-        return;
-      }
+      setPreparing(true);
+      setModal(null);
       try {
+        if (String(originCompanyId) !== String(sessionCompanyId)) throw new Error('Company session changed. Return to registration.');
+        await checkFaceAccess({employeeId, companyId, modifiedBy: operatorId});
         const granted = cameraPermissionStatus === 'granted' || await requestCameraPermission();
         if (!granted) throw new Error('Camera permission is required to register a face.');
         await faceRecognitionService.loadModel();
       } catch (error) {
-        if (isMounted) setPreparationError(error?.message || 'Could not prepare face registration.');
-      } finally {
-        if (isMounted) setIsPreparing(false);
-      }
+        if (current) setModal({title: 'Unable to start registration', message: error.message, showSettings: /permission/i.test(error.message)});
+      } finally { if (current) setPreparing(false); }
     };
-    prepare();
-    return () => { isMounted = false; };
-  }, [cameraPermissionStatus, companyId, employeeId, requestCameraPermission]);
+    if (focused) prepare();
+    return () => { current = false; };
+  }, [attempt, cameraPermissionStatus, checkFaceAccess, companyId, employeeId, focused, operatorId, originCompanyId, requestCameraPermission, sessionCompanyId]);
 
-  const handleComplete = useCallback(async faces => {
-    setCameraError('');
+  const refreshSaved = useCallback(async (version = sessionVersion.current) => {
     try {
-      await registerFace({faces, companyId, employeeId, employeeName});
-      navigation.replace(ROUTES.FACE_REGISTRATION_RESULT, {companyId, employeeId, status: 'success'});
+      const record = await getRegisteredBiometric(employeeId, companyId);
+      if (!record?.faceImage || !record?.faceEmbeding) throw new Error('Saved face details are not yet available.');
+      decodeBackendEmbedding(record.faceEmbeding);
+      if (active.current && version === sessionVersion.current) setModal({title: 'Registration successful', message: `${employeeName || 'Employee'}’s face has been saved to the server.`});
     } catch (error) {
-      const message = error?.message || 'Face registration could not be completed.';
-      const activationPending = message.includes('activation failed');
-      navigation.replace(ROUTES.FACE_REGISTRATION_RESULT, {companyId, employeeId, message, status: activationPending ? 'activationPending' : 'failure'});
+      if (active.current && version === sessionVersion.current) setModal({title: 'Face saved; refresh pending', message: error.message, refresh: true});
     }
-  }, [companyId, employeeId, employeeName, navigation, registerFace]);
+  }, [companyId, employeeId, employeeName]);
 
-  if (isPreparing) {
-    return <SafeAreaView style={styles.state}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.stateText}>Preparing secure face registration…</Text></SafeAreaView>;
-  }
+  const submit = useCallback(async faces => {
+    if (submitting.current || saved.current || !active.current) return;
+    const version = sessionVersion.current;
+    submitting.current = true;
+    photoSamples.current = faces;
+    setModal({title: 'Registration in progress', message: 'Face images captured. Saving the validated face to the server…', busy: true});
+    try {
+      await registerFace({faces, companyId, employeeId, modifiedBy: operatorId});
+      saved.current = true;
+      photoSamples.current = null;
+      if (active.current && version === sessionVersion.current) await refreshSaved(version);
+    } catch (error) {
+      if (active.current && version === sessionVersion.current) setModal({title: 'Registration failed', message: error.message, retrySave: true});
+    } finally { submitting.current = false; }
+  }, [companyId, employeeId, operatorId, refreshSaved, registerFace]);
 
-  if (preparationError) {
-    return (
-      <SafeAreaView style={styles.state}>
-        <Text style={styles.stateText}>{preparationError}</Text>
-        <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.backText}>Go back</Text></Pressable>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <View style={styles.root}>
-      <FaceCamera mode="registration" onCancel={() => navigation.goBack()} onComplete={handleComplete} onError={error => setCameraError(error?.message || 'Face capture failed. Try again.')} />
-      {!!cameraError && <Text accessibilityLiveRegion="polite" style={styles.cameraError}>{cameraError}</Text>}
-    </View>
-  );
+  const retry = () => {
+    if (modal?.refresh) {
+      setModal({title: 'Checking registration', message: 'Refreshing saved face details…', busy: true});
+      refreshSaved();
+    } else if (modal?.retrySave && photoSamples.current) submit(photoSamples.current);
+    else setAttempt(value => value + 1);
+  };
+  return <View style={styles.root}>
+    {preparing ? <SafeAreaView style={styles.state}><ActivityIndicator color="#FFFFFF" /><Text style={styles.text}>Preparing face registration…</Text></SafeAreaView> : !modal && <FaceCamera key={attempt} mode="registration" isPaused={!focused} onCancel={() => navigation.goBack()} onComplete={submit} onError={error => setModal({title: 'Capture failed', message: error.message})} />}
+    <FaceStatusModal visible={!!modal} {...modal} onRetry={saved.current && !modal?.refresh ? undefined : retry} onClose={() => navigation.goBack()} />
+  </View>;
 };
-
-const styles = StyleSheet.create({
-  backButton: {backgroundColor: '#FFFFFF', borderRadius: 22, marginTop: 20, paddingHorizontal: 24, paddingVertical: 12},
-  backText: {color: '#173D24', fontWeight: '800'},
-  cameraError: {backgroundColor: 'rgba(155, 28, 28, 0.9)', bottom: 92, color: '#FFFFFF', left: 20, padding: 12, position: 'absolute', right: 20, textAlign: 'center'},
-  root: {backgroundColor: '#102817', flex: 1},
-  state: {alignItems: 'center', backgroundColor: '#102817', flex: 1, justifyContent: 'center', padding: 24},
-  stateText: {color: '#FFFFFF', fontSize: 16, lineHeight: 23, textAlign: 'center'},
-});
-
+const styles = StyleSheet.create({root: {flex: 1, backgroundColor: '#102817'}, state: {flex: 1, alignItems: 'center', justifyContent: 'center'}, text: {color: '#FFFFFF', marginTop: 16}});
 export default FaceCameraScreen;

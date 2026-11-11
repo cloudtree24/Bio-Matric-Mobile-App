@@ -7,6 +7,9 @@ import {fetchEmployeeDetails, getFilteredEmployees} from '../src/services/employ
 
 jest.mock('@react-native-async-storage/async-storage', () => ({getItem: jest.fn(), setItem: jest.fn()}));
 jest.mock('react-native-vector-icons/Ionicons', () => 'Icon');
+jest.mock('@react-navigation/native', () => ({useFocusEffect: callback => require('react').useEffect(callback, [callback])}));
+jest.mock('../src/services/biometricApi', () => ({getRegisteredBiometric: jest.fn(async () => null)}));
+jest.mock('../src/services/backendFaceService', () => ({decodeBackendEmbedding: jest.fn()}));
 jest.mock('../src/components/AppHeader', () => 'AppHeader');
 jest.mock('../src/context/AdminSessionContext', () => ({useAdminSession: () => ({companyId: 1, isSessionLoading: false})}));
 jest.mock('../src/services/employeeRegistrationApi', () => ({fetchEmployeeDetails: jest.fn(), getFilteredEmployees: jest.fn()}));

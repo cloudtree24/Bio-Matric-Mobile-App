@@ -3,6 +3,7 @@ import {buildBiometricRegistrationPayload, buildFaceEnablePayload} from '../src/
 describe('biometric payloads', () => {
   test('preserves identity values and sends only the supported face fields', () => {
     const payload = buildBiometricRegistrationPayload({
+      modifiedBy: 123,
       companyId: 'company-a',
       employeeId: 'employee-7',
       faceEmbedding: 'embedding-base64',
@@ -10,6 +11,7 @@ describe('biometric payloads', () => {
     });
 
     expect(payload).toMatchObject({
+      ModifiedBy: 123,
       CompanyId: 'company-a',
       EmployeeId: 'employee-7',
       FaceEmbeding: 'embedding-base64',

@@ -105,35 +105,48 @@ test('handles a disabled camera, unmounts it, and retries without capturing', as
   expect(complete).not.toHaveBeenCalled();
 });
 
-test('manual registration captures three validated samples only on button presses', async () => {
+test('registration retains live detection and captures three consistent samples automatically', async () => {
   const complete = jest.fn(async () => ({}));
   await act(async () => { renderer = TestRenderer.create(<FaceCamera mode="registration" onComplete={complete} />); });
-  const press = async label => {
-    const button = renderer.root.findAllByProps({accessibilityRole: 'button'}).find(node => node.findAllByType('Text').some(text => text.props.children === label));
-    await act(async () => button.props.onPress());
-  };
-  await press('Use manual capture');
-  await tick();
-  expect(mockPhotoOutput.capturePhoto).not.toHaveBeenCalled();
-  expect(renderer.root.findByType('Camera').props.outputs).toEqual([mockPhotoOutput]);
-  for (let sample = 1; sample <= 3; sample += 1) {
-    const button = renderer.root.findAllByProps({accessibilityRole: 'button'}).find(node => node.findAllByType('Text').some(text => Array.isArray(text.props.children) && text.props.children[0] === 'Capture face '));
-    await act(async () => button.props.onPress());
-    await tick();
+  expect(JSON.stringify(renderer.toJSON())).not.toContain('Use manual capture');
+  expect(renderer.root.findByType('Camera').props.outputs).toHaveLength(2);
+  await detect([{}]);
+  for (let index = 0; index < 6; index += 1) {
+    await act(async () => jest.advanceTimersByTime(1000));
   }
-  expect(cropCapturedFace).toHaveBeenCalledTimes(3);
   expect(complete).toHaveBeenCalledTimes(1);
   expect(complete.mock.calls[0][0]).toHaveLength(3);
 });
 
-test('manual registration does not save a photo with invalid face count', async () => {
+test('registration rejects a captured photo containing multiple faces', async () => {
   cropCapturedFace.mockRejectedValueOnce(Object.assign(new Error('Multiple faces detected'), {code: 'INVALID_FACE_COUNT'}));
   const complete = jest.fn();
   await act(async () => { renderer = TestRenderer.create(<FaceCamera mode="registration" onComplete={complete} />); });
-  const toggle = renderer.root.findAllByProps({accessibilityRole: 'button'}).find(node => node.findAllByType('Text').some(text => text.props.children === 'Use manual capture'));
-  await act(async () => toggle.props.onPress());
-  const capture = renderer.root.findAllByProps({accessibilityRole: 'button'}).find(node => node.findAllByType('Text').some(text => Array.isArray(text.props.children) && text.props.children[0] === 'Capture face '));
-  await act(async () => capture.props.onPress());
+  await detect([{}]);
+  await act(async () => jest.advanceTimersByTime(1000));
   expect(complete).not.toHaveBeenCalled();
   expect(faceRecognitionService.getEmbedding).not.toHaveBeenCalled();
+});
+
+test('sustained multiple faces produce guidance without verification', async () => {
+  const onError = jest.fn();
+  const complete = jest.fn();
+  await act(async () => { renderer = TestRenderer.create(<FaceCamera mode="recognition" onComplete={complete} onError={onError} />); });
+  await detect([{}, {}]);
+  await act(async () => jest.advanceTimersByTime(3000));
+  expect(onError).toHaveBeenCalledWith(expect.objectContaining({message: expect.stringContaining('Multiple faces detected')}));
+  expect(complete).not.toHaveBeenCalled();
+});
+
+test('navigation during inference discards the captured embedding', async () => {
+  let finish;
+  faceRecognitionService.getEmbedding.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const complete = jest.fn();
+  await open(complete);
+  await detect([{}]);
+  await act(async () => renderer.unmount());
+  renderer = null;
+  await act(async () => finish(new Float32Array([1, 0])));
+  expect(complete).not.toHaveBeenCalled();
+  expect(mockPhoto.dispose).toHaveBeenCalled();
 });

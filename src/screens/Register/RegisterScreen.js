@@ -14,6 +14,10 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppHeader from '../../components/AppHeader';
+import {useFocusEffect} from '@react-navigation/native';
+import {getRegisteredBiometric} from '../../services/biometricApi';
+import {decodeBackendEmbedding} from '../../services/backendFaceService';
+import {getBiometricEmployeeId, getBiometricCompanyId} from '../../utils/backendIdentity';
 import { ROUTES } from '../../constants/routes';
 import { useAdminSession } from '../../context/AdminSessionContext';
 import {
@@ -22,7 +26,7 @@ import {
 } from '../../services/employeeRegistrationApi';
 
 const RegisterScreen = ({ navigation }) => {
-  const { companyId, isSessionLoading } = useAdminSession();
+  const { companyId, operatorId, isSessionLoading } = useAdminSession();
   const [employeeId, setEmployeeId] = useState('');
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -156,261 +160,37 @@ const RegisterScreen = ({ navigation }) => {
     }
   };
 
-  
-// const Registerface = async (employeeId, companyId) => {
-//   try {
-//     console.log('Register Face Clicked');
+  const [faceStatus, setFaceStatus] = useState('loading');
+  const [faceStatusError, setFaceStatusError] = useState('');
+  const biometricCompanyId = employee?.childCompanyId || employee?.employeeBiomatricDetail?.companyId || companyId;
+  const selectedBackendId = employee?.employeeBiomatricDetail?.employeeId || employee?.id;
+  useFocusEffect(React.useCallback(() => {
+    let active = true;
+    setFaceStatus('loading');
+    setFaceStatusError('');
+    if (!employee) return;
+    if (!selectedBackendId) { setFaceStatus('error'); setFaceStatusError('Employee biometric ID is missing.'); return; }
+    getRegisteredBiometric(selectedBackendId, biometricCompanyId).then(record => {
+      if (!active) return;
+      if (!record?.faceEmbeding || !record?.faceImage) { setFaceStatus('missing'); return; }
+      try { decodeBackendEmbedding(record.faceEmbeding); setFaceStatus('registered'); }
+      catch { setFaceStatus('missing'); }
+    }).catch(requestError => {
+      if (active) { setFaceStatus('error'); setFaceStatusError(requestError.message); }
+    });
+    return () => { active = false; };
+  }, [selectedBackendId, biometricCompanyId, employee]));
 
-//     console.log('Employee ID:', employeeId);
-//     console.log('Company ID:', companyId);
-//   } catch (error) {
-//     console.log('Register Face Error:', error);
-//   }
-// };
-
-
-
-
-const Registerface = async (
-  employeeId,
-  companyId,
-  faceImageBase64,
-  faceEmbeddingBase64,
-  modifiedBy,
-) => {
-  try {
-    console.log('Register Face API Started');
-
-    if (!faceImageBase64 || !faceEmbeddingBase64) {
-      Alert.alert(
-        'Face Registration',
-        'Face image or face embedding is missing.',
-      );
-      return;
-    }
-
-    // Remove Base64 data URI prefix if present
-    const cleanFaceImage = faceImageBase64.replace(
-      /^data:image\/\w+;base64,/,
-      '',
-    );
-
-    const payload = {
-      EmployeeId: Number(employeeId),
-      FaceImage: cleanFaceImage,
-      FaceEmbeding: faceEmbeddingBase64,
-      FingerImage: null,
-      FingerEmbeding: null,
-      RetinaImage: null,
-      RetinaEmbeding: null,
-      VoiceRecord: null,
-      VoiceRecordEmbeding: null,
-      CreatedDate: new Date().toISOString(),
-      ModifiedBy: Number(modifiedBy),
-      IsDelete: 0,
-      CompanyId: Number(companyId),
-    };
-
-    const response = await fetch(
-      'http://192.168.29.2:91/api/EmployeeBiomatricRegister/SaveEmployeeImageStringFormat',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    const result = await response.json();
-
-    console.log('Face Registration Response:', result);
-
-    if (!response.ok) {
-      throw new Error(result?.message || 'Face registration failed');
-    }
-
-    Alert.alert('Success', 'Employee face registered successfully.');
-  } catch (error) {
-    console.log('Register Face Error:', error);
-
-    Alert.alert('Error', error.message || 'Unable to register face.');
-  }
-};
-
-
-
-  // const handleRegisterFace = useCallback(async () => {
-  //   logger.debug('👤 ========== FACE REGISTRATION START ==========');
-
-  //   if (registrationRef.current) return;
-  //   const attempt = { active: true };
-  //   registrationRef.current = attempt;
-  //   const current = () =>
-  //     homeMountedRef.current &&
-  //     registrationRef.current === attempt &&
-  //     attempt.active;
-  //   let timeoutId;
-  //   try {
-  //     if (!(await requestCameraPermission())) {
-  //       if (current())
-  //         showError(
-  //           'Permission Denied',
-  //           'Camera access required for face registration',
-  //         );
-  //       return;
-  //     }
-  //     if (!current() || !(await loadFaceModel()) || !current()) return;
-  //     const resolvedCompanyId =
-  //       employeeDetails?.childCompanyId || user?.childCompanyId;
-  //     if (!employeeDetails?.id || !resolvedCompanyId) {
-  //       showError('Error', 'Employee or company details unavailable.');
-  //       return;
-  //     }
-  //     dispatchModal({ type: 'SHOW', key: 'isRegistering' });
-  //     const imagePickerModule = require('react-native-image-picker');
-  //     const pickerLaunchCamera =
-  //       imagePickerModule?.launchCamera ||
-  //       imagePickerModule?.default?.launchCamera;
-  //     if (typeof pickerLaunchCamera !== 'function') {
-  //       throw new Error(
-  //         'Camera module is unavailable. Please restart the app and try again.',
-  //       );
-  //     }
-  //     const res = await new Promise(resolve =>
-  //       pickerLaunchCamera(
-  //         {
-  //           mediaType: 'photo',
-  //           includeBase64: true,
-  //           cameraType: 'front',
-  //           quality: APP_CONFIG.IMAGE.RESIZE_QUALITY,
-  //           maxWidth: APP_CONFIG.IMAGE.RESIZE_WIDTH,
-  //           maxHeight: APP_CONFIG.IMAGE.RESIZE_HEIGHT,
-  //         },
-  //         resolve,
-  //       ),
-  //     );
-  //     if (!current() || res.didCancel) return;
-  //     if (!res.assets?.[0]?.base64) {
-  //       showError('Error', 'No image captured');
-  //       return;
-  //     }
-
-  //     dispatchModal({ type: 'SHOW', key: 'isProcessing' });
-  //     const base64Image = `data:image/jpeg;base64,${res.assets[0].base64}`;
-
-  //     const emb = await Promise.race([
-  //       getEmbedding(base64Image),
-  //       new Promise((_, reject) => {
-  //         timeoutId = setTimeout(() => {
-  //           attempt.active = false;
-  //           reject(
-  //             new Error('Face processing took too long. Please try again.'),
-  //           );
-  //         }, APP_CONFIG.TIMEOUTS.IMAGE_PROCESSING);
-  //       }),
-  //     ]);
-  //     clearTimeout(timeoutId);
-  //     if (!current()) return;
-
-  //     if (!emb) throw new Error('Failed to get embedding');
-
-  //     const embeddingBase64 = Buffer.from(
-  //       new Float32Array(emb).buffer,
-  //     ).toString('base64');
-
-  //     const pureBase64 = base64Image.replace(/^data:image\/\w+;base64,/, '');
-
-  //     logger.debug('💾 ========== FACE REGISTRATION PAYLOAD ==========', {
-  //       employeeId: employeeDetails.id,
-  //       companyId: resolvedCompanyId,
-  //       faceBytes: pureBase64?.length || 0,
-  //       embeddingBytes: embeddingBase64?.length || 0,
-  //     });
-
-  //     const payload = {
-  //       ...buildBiometricRegistrationPayload(
-  //         employeeDetails,
-  //         pureBase64,
-  //         embeddingBase64,
-  //         null,
-  //       ),
-  //       CompanyId: resolvedCompanyId,
-  //     };
-
-  //     // console.log(payload , 'biometric registration payload');
-
-  //     await ApiService.saveBiometricRegistration(payload);
-
-  //     if (!current()) return;
-
-  //     const enablePayload = {
-  //       EmployeeId: employeeDetails.id,
-  //       IsFaceAuthunticateEnable: 'true',
-  //       IsFingerAuthenticateEnable: 'false',
-  //       CreatedDate: new Date().toISOString(),
-  //       CreatedBy: employeeDetails.id,
-  //       ModifiedDate: new Date().toISOString(),
-  //       ModifiedBy: employeeDetails.id,
-  //     };
-
-  //     await ApiService.updateBiometricEnableStatus(enablePayload);
-  //     if (!current()) return;
-
-  //     await AsyncStorage.multiSet([
-  //       [STORAGE_KEYS.FACE_ENABLED, 'true'],
-  //       [STORAGE_KEYS.FINGERPRINT_ENABLED, 'false'],
-  //       [STORAGE_KEYS.BIOMETRIC_TYPE, 'face'],
-  //     ]);
-
-  //     if (!current()) return;
-
-  //     dispatchBiometric({
-  //       payload: {
-  //         registeredFace: base64Image,
-  //         cachedFaceImage: base64Image,
-  //         biometricType: 'face',
-  //         isBiometricEnabled: true,
-  //       },
-  //     });
-
-  //     dispatchModal({ type: 'HIDE', key: 'showRegistration' });
-  //     showError('✅ Success', 'Face registered successfully!');
-  //   } catch (err) {
-  //     if (homeMountedRef.current && registrationRef.current === attempt) {
-  //       logger.error('Register face error:', err);
-  //       showError('❌ Error', err.message || 'Failed to register face');
-  //     }
-  //   } finally {
-  //     if (timeoutId) clearTimeout(timeoutId);
-  //     if (registrationRef.current === attempt) {
-  //       registrationRef.current = null;
-  //       attempt.active = false;
-  //       if (homeMountedRef.current) {
-  //         faceScanCallbacksRef.current = { resolve: null, reject: null };
-  //         dispatchModal({ type: 'HIDE', key: 'showFaceScanCamera' });
-  //         dispatchModal({ type: 'RESET_LOADING' });
-  //       }
-  //     }
-  //   }
-  // }, [
-  //   requestCameraPermission,
-  //   loadFaceModel,
-  //   getEmbedding,
-  //   employeeDetails,
-  //   user?.childCompanyId,
-  //   showError,
-  // ]);
-
-
-
-
-
-  const needsRegistration =
-    employee &&
-    (!String(employee.employeeBiomatricDetail?.faceImage || '').trim() ||
-      !String(employee.employeeBiomatricDetail?.faceEmbeding || '').trim());
+  const openRegistration = () => {
+    try {
+      getBiometricEmployeeId(employee);
+      navigation.navigate(ROUTES.FACE_CAMERA, {
+        employeeId: selectedBackendId, employeeName: employee.employeeName || '',
+        companyId: getBiometricCompanyId(employee, companyId), sessionCompanyId: companyId, modifiedBy: operatorId ?? null,
+      });
+    } catch (identityError) { setError(identityError.message); }
+  };
+  const needsRegistration = faceStatus !== 'registered';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -522,7 +302,7 @@ const Registerface = async (
               </Text>
 
               <Text style={styles.value}>
-                Employee ID: {employee.id || '—'}
+                Record ID: {employee.id || '—'}
               </Text>
 
               <Text style={styles.value}>
@@ -535,6 +315,7 @@ const Registerface = async (
                 Designation: {employee.designationName || '—'}
               </Text>
 
+              {!!faceStatusError && <><Text style={styles.error}>{faceStatusError}</Text><Pressable accessibilityRole="button" onPress={() => setEmployee(value => ({...value}))}><Text style={styles.value}>Retry registration status</Text></Pressable></>}
               <View style={styles.faceRegisterRow}>
                 <View style={styles.faceRegisterInfo}>
                   <Text style={styles.faceRegisterTitle}>
@@ -542,7 +323,7 @@ const Registerface = async (
                   </Text>
                   <Text style={styles.faceRegisterSubtitle}>
                     {needsRegistration
-                      ? 'Face verification not Register'
+                      ? faceStatus === 'loading' ? 'Checking registration…' : faceStatus === 'error' ? 'Unable to check registration' : 'Face registration required'
                       : 'Face registered successfully'}
                   </Text>
                 </View>
@@ -553,7 +334,8 @@ const Registerface = async (
                     accessibilityLabel={`Register face for ${
                       employee.employeeName || employee.employeeId
                     }`}
-                    onPress={() => Registerface(employee.employeeId, companyId)}
+                    onPress={openRegistration}
+                    disabled={faceStatus === 'loading' || faceStatus === 'error'}
                     style={styles.registerFaceButton}
                   >
                     <Text style={styles.registerFaceButtonText}>Register</Text>

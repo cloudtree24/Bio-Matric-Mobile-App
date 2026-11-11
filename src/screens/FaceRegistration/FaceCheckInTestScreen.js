@@ -1,145 +1,164 @@
+// @refresh reset
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Modal, Pressable, SafeAreaView, StyleSheet, Text, View} from 'react-native';
-
+import {ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View} from 'react-native';
+import {useIsFocused} from '@react-navigation/native';
 import FaceCamera from '../../components/FaceCamera';
-import {COLORS} from '../../constants/colors';
-import {FACE_CONFIG} from '../../config/faceConfig';
+import FaceStatusModal from '../../components/FaceStatusModal';
+import {useAdminSession} from '../../context/AdminSessionContext';
 import {useCameraPermission} from '../../hooks/useCameraPermission';
 import faceRecognitionService from '../../services/faceRecognitionService';
-import {getAllLocalFaces} from '../../services/localFaceStorage';
-import {findBestEmployeeMatch} from '../../services/faceMatchingService';
+import {getRegisteredBiometric} from '../../services/biometricApi';
+import {fetchEmployeeDetails} from '../../services/employeeRegistrationApi';
+import {getBiometricEmployeeId, getBiometricCompanyId, requireBackendId} from '../../utils/backendIdentity';
+import {decodeBackendEmbedding, verifyBackendFace} from '../../services/backendFaceService';
 import {createFaceCheckInController} from '../../services/faceCheckInService';
-import {saveLocalAttendance} from '../../services/localAttendanceStorage';
 
 const FaceCheckInTestScreen = ({navigation}) => {
+  const {companyId, employeeId: sessionEmployeeId, isSessionLoading} = useAdminSession();
+  const focused = useIsFocused();
   const {cameraPermissionStatus, requestCameraPermission} = useCameraPermission();
-  const [employees, setEmployees] = useState([]);
-  const [error, setError] = useState('');
-  const [isPreparing, setIsPreparing] = useState(true);
-  const [isReady, setIsReady] = useState(false);
-  const [result, setResult] = useState(null);
+  const [employeeCode, setEmployeeCode] = useState('');
+  const [preparing, setPreparing] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [modal, setModal] = useState(null);
   const [scanSession, setScanSession] = useState(0);
-  const [checkIn, setCheckIn] = useState(null);
+  const identity = useRef(null);
+  const registeredEmbedding = useRef(null);
   const controller = useRef(null);
+  const processing = useRef(false);
+  const preparingRef = useRef(false);
+  const generation = useRef(0);
+  const active = useRef(false);
+  const resultShown = useRef(false);
 
-  const resetCheckIn = useCallback(() => {
-    setResult(null);
-    setScanSession(value => value + 1);
-    setCheckIn(null);
-    controller.current = null;
-  }, []);
-
-  const startTest = useCallback(async () => {
-    setError('');
-    setIsPreparing(true);
-    try {
-      const granted = cameraPermissionStatus === 'granted' || await requestCameraPermission();
-      if (!granted) throw new Error('Camera permission is required for this test.');
-      await faceRecognitionService.loadModel();
-      const registered = await getAllLocalFaces();
-      if (!registered.some(employee => employee.faces.some(face => face.embedding))) {
-        throw new Error('No registered faces were found on this device. Register an employee face first.');
-      }
-      setEmployees(registered);
-      resetCheckIn();
-      setIsReady(true);
-    } catch (requestError) {
-      setError(requestError?.message || 'Could not prepare the face check-in test.');
-    } finally {
-      setIsPreparing(false);
-    }
-  }, [cameraPermissionStatus, requestCameraPermission, resetCheckIn]);
-
-  const initialStart = useRef(startTest);
   useEffect(() => {
-    initialStart.current();
-  }, []);
+    active.current = focused;
+    generation.current += 1;
+    setReady(false);
+    setPreparing(false);
+    setModal(null);
+    identity.current = null;
+    registeredEmbedding.current = null;
+    controller.current = null;
+    processing.current = false;
+    preparingRef.current = false;
+    resultShown.current = false;
+    return () => {
+      active.current = false;
+      generation.current += 1;
+      registeredEmbedding.current = null;
+      identity.current = null;
+    };
+  }, [companyId, sessionEmployeeId, focused]);
+
+  const startVerification = useCallback(async () => {
+    if (preparingRef.current || !active.current || isSessionLoading) return;
+    preparingRef.current = true;
+    const version = ++generation.current;
+    const current = () => active.current && version === generation.current;
+    setPreparing(true);
+    setReady(false);
+    setModal(null);
+    registeredEmbedding.current = null;
+    identity.current = null;
+    controller.current = null;
+    resultShown.current = false;
+    try {
+      requireBackendId(companyId, 'Company ID');
+      let employeeId = sessionEmployeeId;
+      let biometricCompanyId = Number(companyId);
+      if (!employeeId) {
+        if (!employeeCode.trim()) throw new Error('Enter your employee code to continue.');
+        const employees = await fetchEmployeeDetails(companyId, employeeCode.trim());
+        if (!current()) return;
+        if (employees.length !== 1) throw new Error('Employee not found. Check your employee code.');
+        employeeId = getBiometricEmployeeId(employees[0]);
+        biometricCompanyId = getBiometricCompanyId(employees[0], companyId);
+      }
+      requireBackendId(employeeId, 'Employee ID');
+      const record = await getRegisteredBiometric(employeeId, biometricCompanyId);
+      if (!current()) return;
+      if (!record?.faceImage || !record?.faceEmbeding) {
+        setModal({title: 'Face registration required', message: 'Ask your administrator to register your face before checking in.'});
+        return;
+      }
+      const embedding = decodeBackendEmbedding(record.faceEmbeding);
+      const granted = cameraPermissionStatus === 'granted' || await requestCameraPermission();
+      if (!current()) return;
+      if (!granted) throw new Error('Camera permission is required for face verification.');
+      await faceRecognitionService.loadModel();
+      if (!current()) return;
+      identity.current = {employeeId: Number(employeeId), companyId: biometricCompanyId};
+      registeredEmbedding.current = embedding;
+      setScanSession(value => value + 1);
+      setReady(true);
+    } catch (error) {
+      if (current()) setModal({title: 'Unable to start verification', message: error.message, retry: true, showSettings: /permission/i.test(error.message)});
+    } finally {
+      if (current()) { setPreparing(false); preparingRef.current = false; }
+    }
+  }, [cameraPermissionStatus, companyId, employeeCode, isSessionLoading, requestCameraPermission, sessionEmployeeId]);
 
   const verifyCapture = useCallback(async embedding => {
-    setError('');
-    const match = findBestEmployeeMatch(embedding, employees);
-    if (match.matched) {
-      if (controller.current) return match;
-      const companyId = match.companyId;
+    if (processing.current || resultShown.current || !active.current || !registeredEmbedding.current || !identity.current) return {matched: false};
+    processing.current = true;
+    const version = generation.current;
+    const current = () => active.current && version === generation.current;
+    setModal({title: 'Face verification in progress', message: 'Comparing your face with your registered employee record…', busy: true});
+    try {
+      const match = verifyBackendFace(registeredEmbedding.current, embedding, identity.current);
+      if (!current()) return {matched: false};
+      resultShown.current = true;
+      if (!match.matched) {
+        setModal({title: 'Face does not match', message: 'Your face did not match the selected employee. Improve the lighting and try again.', retryScan: true});
+        return match;
+      }
       controller.current = createFaceCheckInController({
-        companyId,
+        companyId: identity.current.companyId,
+        expectedEmployeeId: identity.current.employeeId,
+        // This test route preserves its existing no-location policy.
         requireLocation: false,
-        submitAttendance: payload => saveLocalAttendance(companyId, payload),
-        onState: setCheckIn,
+        isActive: current,
+        onState: state => {
+          if (!current()) return;
+          setModal(state.status === 'success'
+            ? {title: 'Check-in successful', message: 'Your face matched and the server confirmed your check-in.'}
+            : state.status === 'failed'
+              ? {title: 'Face matched; check-in failed', message: state.error, retryAttendance: true}
+              : {title: 'Face matched', message: 'Saving your check-in to the server…', busy: true});
+        },
       });
-      setResult({...match, companyId});
       await controller.current.identify(match);
-    }
-    return match;
-  }, [employees]);
+      return match;
+    } catch (error) {
+      if (current()) {
+        resultShown.current = true;
+        setModal({title: 'Verification failed', message: error.message, retryScan: true});
+      }
+      return {matched: false};
+    } finally { if (current()) processing.current = false; }
+  }, []);
 
-  if (isReady) {
-    return (
-      <View style={styles.cameraRoot}>
-        <FaceCamera key={scanSession} mode="recognition" isPaused={!!result} onCancel={() => navigation.goBack()} onComplete={verifyCapture} onError={cameraError => setError(cameraError?.message || 'Camera test failed.')} />
-        {!!error && <Text accessibilityLiveRegion="polite" style={styles.cameraError}>{error}</Text>}
-        <Modal animationType="fade" onRequestClose={() => { if (checkIn?.status !== 'submitting') resetCheckIn(); }} transparent visible={!!result}>
-          <View style={styles.modalBackdrop}>
-            <View accessibilityViewIsModal style={styles.modalCard}>
-              <Text style={[styles.resultIcon, result?.matched ? styles.match : styles.noMatch]}>{result?.matched ? '✓' : '!'}</Text>
-              <Text style={styles.modalTitle}>{result?.matched ? 'Face matched' : 'Face not recognized'}</Text>
-              <Text style={styles.modalText}>{result?.matched ? 'Employee identified from faces saved on this device.' : 'The captured face does not meet the configured matching threshold.'}</Text>
-              <Text accessibilityLiveRegion="polite" style={styles.modalText}>
-                {checkIn?.status === 'success' ? (checkIn.response?.alreadyCheckedIn ? 'Already checked in today on this device.' : 'Check-In Successful — saved on this device.') : checkIn?.status === 'failed' ? checkIn.error : 'Saving local check-in…'}
-              </Text>
-              {checkIn?.status === 'submitting' && <ActivityIndicator color={COLORS.darkGreen} />}
-              {checkIn?.status === 'failed' && <Pressable accessibilityRole="button" onPress={() => controller.current.retry()} style={styles.modalButton}><Text style={styles.modalButtonText}>Retry check-in</Text></Pressable>}
-              <Text style={styles.scoreText}>{result?.employeeName} · Employee {result?.employeeId} · Company {result?.companyId} · Score: {result?.score?.toFixed(3)}</Text>
-              <Text style={styles.scoreText}>Second-best score: {result?.secondBestEmployeeId === null ? '—' : result?.secondBestScore?.toFixed(3)}</Text>
-              <Text style={styles.thresholdText}>Required: similarity ≥ {FACE_CONFIG.matchThreshold} · gap ≥ {FACE_CONFIG.minScoreGap}</Text>
-              <Pressable accessibilityRole="button" disabled={checkIn?.status === 'submitting'} onPress={resetCheckIn} style={styles.modalButton}><Text style={styles.modalButtonText}>Test again</Text></Pressable>
-              <Pressable accessibilityRole="button" disabled={checkIn?.status === 'submitting'} onPress={() => navigation.goBack()} style={styles.closeButton}><Text style={styles.closeText}>Close</Text></Pressable>
-            </View>
-          </View>
-        </Modal>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.form}>
-        <Text style={styles.title}>Face Check-In Test</Text>
-        <Text style={styles.description}>Match against faces saved on this device and record a local check-in. No internet or location check is required.</Text>
-        {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
-        <Pressable accessibilityRole="button" disabled={isPreparing} onPress={startTest} style={[styles.primaryButton, isPreparing && styles.disabled]}>{isPreparing ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.primaryText}>Retry opening camera</Text>}</Pressable>
-        <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.backText}>Back</Text></Pressable>
-      </View>
-    </SafeAreaView>
-  );
+  const retry = () => {
+    if (modal?.retryAttendance) controller.current?.retry();
+    else startVerification();
+  };
+  return <SafeAreaView style={styles.root}>
+    {ready ? <FaceCamera key={scanSession} mode="recognition" isPaused={!focused || !!modal} onCancel={() => navigation.goBack()} onComplete={verifyCapture} onError={error => setModal({title: 'Face capture failed', message: error.message, retryScan: true})} /> : <View style={styles.form}>
+      <Text style={styles.title}>Face Check-In</Text>
+      <Text style={styles.description}>Verify your face against your employee record before saving check-in.</Text>
+      {!sessionEmployeeId && <TextInput accessibilityLabel="Employee code" placeholder="Enter employee code" placeholderTextColor="#68707A" autoCapitalize="none" autoCorrect={false} value={employeeCode} onChangeText={setEmployeeCode} editable={!preparing} onSubmitEditing={startVerification} returnKeyType="go" style={styles.input} />}
+      <Pressable accessibilityRole="button" disabled={preparing || isSessionLoading || !companyId} onPress={startVerification} style={styles.button}>{preparing ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>Start verification</Text>}</Pressable>
+      {!companyId && <Text style={styles.description}>Please sign in to select your company.</Text>}
+      <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}><Text>Back</Text></Pressable>
+    </View>}
+    <FaceStatusModal visible={!!modal} {...modal} onRetry={modal?.retry || modal?.retryScan || modal?.retryAttendance ? retry : undefined} retryLabel={modal?.retryAttendance ? 'Retry check-in' : 'Try again'} onClose={() => { setModal(null); setReady(false); registeredEmbedding.current = null; }} />
+  </SafeAreaView>;
 };
-
 const styles = StyleSheet.create({
-  backButton: {alignItems: 'center', marginTop: 14, padding: 10},
-  backText: {color: COLORS.darkGreen, fontWeight: '700'},
-  cameraError: {backgroundColor: 'rgba(155, 28, 28, 0.9)', bottom: 92, color: COLORS.white, left: 20, padding: 12, position: 'absolute', right: 20, textAlign: 'center'},
-  cameraRoot: {backgroundColor: '#102817', flex: 1},
-  closeButton: {alignItems: 'center', marginTop: 10, padding: 10},
-  closeText: {color: COLORS.darkGreen, fontWeight: '700'},
-  description: {color: '#476452', fontSize: 15, lineHeight: 22, marginBottom: 26, marginTop: 8},
-  disabled: {opacity: 0.7},
-  error: {color: '#B42318', fontSize: 14, marginBottom: 14},
-  form: {flex: 1, padding: 24, paddingTop: 56},
-  match: {backgroundColor: '#14BFA5'},
-  modalBackdrop: {alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.48)', flex: 1, justifyContent: 'center', padding: 24},
-  modalButton: {alignItems: 'center', backgroundColor: '#14BFA5', borderRadius: 12, marginTop: 24, padding: 14, width: '100%'},
-  modalButtonText: {color: COLORS.white, fontSize: 16, fontWeight: '800'},
-  modalCard: {alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 24, padding: 28, width: '100%'},
-  modalText: {color: '#68707A', fontSize: 15, lineHeight: 22, marginTop: 10, textAlign: 'center'},
-  modalTitle: {color: '#20262D', fontSize: 27, fontWeight: '800', marginTop: 16},
-  noMatch: {backgroundColor: '#FFF1D6'},
-  primaryButton: {alignItems: 'center', backgroundColor: COLORS.darkGreen, borderRadius: 10, justifyContent: 'center', minHeight: 50},
-  primaryText: {color: COLORS.white, fontSize: 16, fontWeight: '800'},
-  resultIcon: {borderRadius: 34, color: COLORS.darkGreen, fontSize: 36, fontWeight: '800', height: 68, overflow: 'hidden', textAlign: 'center', width: 68},
-  safeArea: {backgroundColor: COLORS.lightGreen, flex: 1},
-  scoreText: {color: '#476452', fontSize: 13, marginTop: 18},
-  thresholdText: {color: '#587061', fontSize: 12, marginTop: 6, textAlign: 'center'},
-  title: {color: COLORS.darkGreen, fontSize: 28, fontWeight: '800'},
+  root: {flex: 1, backgroundColor: '#F6FBF8'}, form: {padding: 24, paddingTop: 56},
+  title: {fontSize: 28, color: '#153C2D', fontWeight: '800'}, description: {color: '#476452', lineHeight: 22, marginVertical: 16},
+  input: {minHeight: 48, borderWidth: 1, borderColor: '#D6E3DA', borderRadius: 8, paddingHorizontal: 12, color: '#153C2D', marginBottom: 16},
+  button: {minHeight: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#07583C', borderRadius: 10}, buttonText: {color: '#FFFFFF', fontWeight: '700'}, back: {alignItems: 'center', padding: 16},
 });
-
 export default FaceCheckInTestScreen;

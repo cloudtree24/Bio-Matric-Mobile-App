@@ -6,10 +6,15 @@ export const FACE_CONFIG = {
   registrationConsistencyThreshold: 0.75,
   modelFileName: 'mobilefacenet.onnx',
   inputSize: 112,
+  embeddingSize: 128,
+  minimumFacePixels: 64,
+  minimumBrightness: 35,
+  maximumBrightness: 225,
+  minimumSharpness: 20,
   resizeWidth: 500,
   resizeHeight: 500,
   imageQuality: 70,
-  // More forgiving local face-match policy. Both limits must still pass.
+  // One-employee verification requires both limits to pass.
   cosineThreshold: 0.78,
   euclideanThreshold: 0.85,
   processingTimeoutMs: 30000,

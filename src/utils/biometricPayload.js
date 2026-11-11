@@ -1,4 +1,4 @@
-export const buildBiometricRegistrationPayload = ({employeeId, companyId, faceImage, faceEmbedding}) => {
+export const buildBiometricRegistrationPayload = ({employeeId, companyId, faceImage, faceEmbedding, modifiedBy}) => {
   const now = new Date().toISOString();
 
   return {
@@ -12,7 +12,7 @@ export const buildBiometricRegistrationPayload = ({employeeId, companyId, faceIm
     VoiceRecord: null,
     VoiceRecordEmbeding: null,
     CreatedDate: now,
-    ModifiedBy: employeeId,
+    ModifiedBy: modifiedBy ?? null,
     IsDelete: 0,
     CompanyId: companyId,
   };
