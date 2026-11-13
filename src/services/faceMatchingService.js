@@ -62,5 +62,7 @@ export const findBestEmployeeMatch = (liveEmbedding, employees, threshold = FACE
 
 // Company-wide identification entry point. `employees` is expected to be the
 // decoded, employee-grouped result from getCompanyFaceTemplates.
-export const matchEmployeeFace = (liveEmbedding, employees) =>
-  findBestEmployeeMatch(liveEmbedding, employees);
+export const matchEmployeeFace = (liveEmbedding, employees) => {
+  const result = findBestEmployeeMatch(liveEmbedding, employees);
+  return {...result, employeeCode: result.matched ? employees.find(employee => employee.employeeId === result.employeeId)?.employeeCode : null};
+};

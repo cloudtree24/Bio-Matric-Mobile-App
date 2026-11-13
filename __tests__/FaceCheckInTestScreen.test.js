@@ -36,7 +36,8 @@ test('loads company templates once and checks in the identified employee', async
   await act(async () => { await camera.props.onComplete(new Float32Array([1, 0])); });
   expect(matchEmployeeFace).toHaveBeenCalledWith(expect.any(Float32Array), templates);
   expect(saveAttendance).toHaveBeenCalledWith({EmployeeId: 10});
-  expect(JSON.stringify(renderer.toJSON())).toContain('Check-in successful');
+  expect(JSON.stringify(renderer.toJSON())).toContain('Check-in Successful');
+  expect(JSON.stringify(renderer.toJSON())).toContain('Employee One');
 });
 
 test('keeps the camera closed when the company has no valid templates', async () => {

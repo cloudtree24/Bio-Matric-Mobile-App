@@ -18,6 +18,8 @@ import { getCompanyFaceTemplates } from '../../services/biometricApi';
 import { requireBackendId } from '../../utils/backendIdentity';
 import { matchEmployeeFace } from '../../services/faceMatchingService';
 import { createFaceCheckInController } from '../../services/faceCheckInService';
+import {buildFaceAttendancePayload} from '../../services/attendanceApi';
+import {ROUTES} from '../../constants/routes';
 
 const FaceCheckInTestScreen = ({ navigation }) => {
   const { companyId, isSessionLoading } = useAdminSession();
@@ -35,6 +37,8 @@ const FaceCheckInTestScreen = ({ navigation }) => {
   const generation = useRef(0);
   const active = useRef(false);
   const resultShown = useRef(false);
+  const attendanceSubmitted = useRef(false);
+  const navigationTimer = useRef(null);
 
   useEffect(() => {
     active.current = focused;
@@ -47,7 +51,9 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     processing.current = false;
     preparingRef.current = false;
     resultShown.current = false;
+    attendanceSubmitted.current = false;
     return () => {
+      clearTimeout(navigationTimer.current);
       active.current = false;
       generation.current += 1;
       employeeTemplates.current = [];
@@ -65,6 +71,7 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     employeeTemplates.current = [];
     controller.current = null;
     resultShown.current = false;
+    attendanceSubmitted.current = false;
     try {
       requireBackendId(companyId, 'Company ID');
       const biometricCompanyId = Number(companyId);
@@ -151,11 +158,21 @@ const FaceCheckInTestScreen = ({ navigation }) => {
         }
         controller.current = createFaceCheckInController({
           companyId: Number(companyId),
+          buildPayload: buildFaceAttendancePayload,
           // This test route preserves its existing no-location policy.
           requireLocation: false,
           isActive: current,
           onState: state => {
             if (!current()) return;
+            if (state.status === 'success') {
+              if (attendanceSubmitted.current) return;
+              attendanceSubmitted.current = true;
+              setModal({title: 'Check-in Successful', message: 'Your attendance has been recorded.', employee: state.match});
+              navigationTimer.current = setTimeout(() => {
+                if (current()) navigation.reset({index: 0, routes: [{name: ROUTES.ADMIN_DASHBOARD}]});
+              }, 1800);
+              return;
+            }
             setModal(
               state.status === 'success'
                 ? {
@@ -193,7 +210,7 @@ const FaceCheckInTestScreen = ({ navigation }) => {
         if (current()) processing.current = false;
       }
     },
-    [companyId],
+    [companyId, navigation],
   );
 
   const retry = () => {

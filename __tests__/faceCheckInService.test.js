@@ -1,7 +1,13 @@
 jest.mock('../src/services/apiClient', () => ({__esModule: true, default: {post: jest.fn()}}));
+jest.mock('react-native-config', () => ({__esModule: true, default: {}}));
 import apiClient from '../src/services/apiClient';
 import {createFaceCheckInController} from '../src/services/faceCheckInService';
-import {buildAttendancePayload} from '../src/services/attendanceApi';
+import {buildAttendancePayload, buildFaceAttendancePayload} from '../src/services/attendanceApi';
+
+test('uses the numeric matched ID for both attendance identity fields', () => {
+  expect(buildFaceAttendancePayload({employeeId: 13, employeeCode: 'AA_14'})).toMatchObject({EmployeeId: '13', EmployeeCode: '13'});
+  expect(() => buildFaceAttendancePayload({employeeId: 'AA_14'})).toThrow('employee ID');
+});
 
 const match = {matched: true, employeeId: 44, employeeName: 'Employee One', score: 0.88, scoreGap: 0.27};
 let checkLocation;
@@ -59,6 +65,6 @@ test('location rejection cannot submit attendance', async () => {
 test('uses normal-flow local date/time and device payload fields', () => {
   expect(buildAttendancePayload(44, new Date(2026, 9, 7, 9, 5, 3).getTime())).toEqual({
     EmployeeId: '44', EmployeeCode: '44', LogDateTime: '2026-10-07T09:05:03', LogDate: '2026-10-07', LogTime: '09:05:03',
-    Direction: 'In', DeviceName: 'Mobile App', SerialNo: '1', VerificationCode: '1',
+    Direction: 'In', DeviceName: null, SerialNo: null, VerificationCode: null,
   });
 });

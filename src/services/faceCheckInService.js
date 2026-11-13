@@ -3,7 +3,7 @@ import {buildAttendancePayload, saveAttendance} from './attendanceApi';
 
 // One controller per camera session. Failures retain the verified identity;
 // only an explicit retry can submit it again.
-export const createFaceCheckInController = ({companyId, expectedEmployeeId = null, isActive = () => true, checkLocation, requireLocation = true, submitAttendance = saveAttendance, onState = () => {}}) => {
+export const createFaceCheckInController = ({companyId, expectedEmployeeId = null, isActive = () => true, checkLocation, requireLocation = true, buildPayload = match => buildAttendancePayload(match.employeeId), submitAttendance = saveAttendance, onState = () => {}}) => {
   let verifiedMatch = null;
   let request = null;
   let status = 'identifying';
@@ -27,7 +27,7 @@ export const createFaceCheckInController = ({companyId, expectedEmployeeId = nul
         if (!location?.inside) throw new Error(location?.message || 'Outside allowed area.');
       }
       if (!isActive()) throw new Error('The check-in session has ended.');
-      payload = payload || buildAttendancePayload(verifiedMatch.employeeId);
+      payload = payload || buildPayload(verifiedMatch);
       response = await submitAttendance(payload);
       publish('success');
       return response;
