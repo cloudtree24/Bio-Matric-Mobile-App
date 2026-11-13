@@ -4,7 +4,8 @@ jest.mock('../src/services/apiClient', () => ({
 }));
 
 import apiClient from '../src/services/apiClient';
-import {enableFaceAttendance, getFaceAccess, saveFaceRegistration} from '../src/services/biometricApi';
+import {enableFaceAttendance, getCompanyFaceTemplates, getFaceAccess, saveFaceRegistration} from '../src/services/biometricApi';
+import {float32ToBase64} from '../src/utils/base64';
 
 describe('biometric API client', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -55,4 +56,20 @@ describe('backend biometric retrieval', () => {
   test('rejects display codes in numeric biometric routes', async () => {
     await expect(getRegisteredBiometric('AA_11', 1)).rejects.toThrow('Employee ID');
   });
+});
+
+test('loads, validates, decodes, and groups company face templates once', async () => {
+  const embedding = float32ToBase64(Float32Array.from({length: 128}, (_, index) => index === 0 ? 1 : 0));
+  apiClient.get.mockResolvedValue({data: [
+    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 14, faceEmbeding: embedding, companyId: 2},
+    {employeeId: 15, faceEmbeding: 'invalid', companyId: 1},
+    {employeeId: 16, faceEmbeding: embedding, companyId: 1, isDelete: 1},
+  ]});
+
+  await expect(getCompanyFaceTemplates(1)).resolves.toEqual([
+    expect.objectContaining({employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', companyId: 1, faces: [expect.objectContaining({embedding: expect.any(Float32Array)}), expect.objectContaining({embedding: expect.any(Float32Array)})]}),
+  ]);
+  expect(apiClient.get).toHaveBeenLastCalledWith('/EmployeeBiomatricRegister/GetAllEmployeeBiomatricDetails/1');
 });

@@ -59,3 +59,8 @@ export const findBestEmployeeMatch = (liveEmbedding, employees, threshold = FACE
   if (__DEV__) console.info('[face-match] Best match', {employeeId: bestEmployee?.employeeId, score, secondBestEmployeeId: secondBestEmployee?.employeeId, secondBestScore, scoreGap, matched, reason});
   return {matched, companyId: matched ? bestEmployee.companyId : null, employeeId: matched ? bestEmployee.employeeId : null, employeeName: matched ? bestEmployee.employeeName : null, score, scoreGap, reason, secondBestScore, secondBestEmployeeId: secondBestEmployee?.employeeId ?? null};
 };
+
+// Company-wide identification entry point. `employees` is expected to be the
+// decoded, employee-grouped result from getCompanyFaceTemplates.
+export const matchEmployeeFace = (liveEmbedding, employees) =>
+  findBestEmployeeMatch(liveEmbedding, employees);

@@ -1,18 +1,9 @@
 import {FACE_CONFIG} from '../config/faceConfig';
-import {base64ToFloat32, stripDataUriPrefix} from '../utils/base64';
+import {decodeFaceEmbedding, stripDataUriPrefix} from '../utils/base64';
 import {cosineSimilarity} from './faceMatchingService';
 import faceRecognitionService from './faceRecognitionService';
 
-export const decodeBackendEmbedding = value => {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || value.length % 4 !== 0) {
-    throw new Error('The registered face embedding is invalid. Register the face again.');
-  }
-  const embedding = base64ToFloat32(value);
-  if (embedding.length !== FACE_CONFIG.embeddingSize || !embedding.every(Number.isFinite) || !embedding.some(v => v !== 0)) {
-    throw new Error('The registered face is incompatible with this model. Register the face again.');
-  }
-  return faceRecognitionService.normalize(embedding);
-};
+export const decodeBackendEmbedding = decodeFaceEmbedding;
 
 // The API stores one sample. Choose the captured sample most consistent with
 // the other samples, keeping its image and embedding paired.

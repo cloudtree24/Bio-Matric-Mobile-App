@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import {validateBase64Image} from '../utils/faceValidation';
 import {requireBackendId} from '../utils/backendIdentity';
+import {decodeFaceEmbedding} from '../utils/base64';
 
 const isSuccessResponse = data => {
   const result = data?.data || data?.Data || data?.result || data?.Result || data?.response || data;
@@ -39,6 +40,52 @@ export const getRegisteredBiometric = async (employeeId, companyId) => {
   const image = validateBase64Image(record.faceImage);
   if (!image.isValid && !record.faceEmbeding) return null;
   return {...record, faceImage: image.isValid ? image.value : null};
+};
+
+const getArrayResponse = data => {
+  if (Array.isArray(data)) return data;
+  for (const key of ['data', 'Data', 'result', 'Result', 'items', 'value']) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+  throw new Error('Unexpected biometric response from the server.');
+};
+
+const isInactiveBiometric = record =>
+  Number(record?.isDelete ?? record?.isDeleted) === 1 ||
+  record?.isActive === false || Number(record?.isActive) === 0 ||
+  String(record?.status || '').toLowerCase() === 'inactive';
+
+// Templates are decoded once at load time and grouped so a person with more
+// than one enrolled template can never occupy multiple ranking positions.
+export const getCompanyFaceTemplates = async companyId => {
+  const company = requireBackendId(companyId, 'Company ID');
+  const {data} = await apiClient.get(
+    `/EmployeeBiomatricRegister/GetAllEmployeeBiomatricDetails/${company}`,
+  );
+  const templatesByEmployee = new Map();
+
+  getArrayResponse(data).forEach(record => {
+    const employeeId = Number(record?.employeeId);
+    if (!record || isInactiveBiometric(record) || Number(record.companyId) !== company ||
+      !Number.isInteger(employeeId) || employeeId <= 0 || !record.faceEmbeding) return;
+
+    try {
+      const embedding = decodeFaceEmbedding(record.faceEmbeding);
+      const current = templatesByEmployee.get(employeeId) || {
+        employeeId,
+        employeeCode: record.employeeCode || null,
+        employeeName: record.employeeName || null,
+        companyId: company,
+        faces: [],
+      };
+      current.faces.push({embedding});
+      templatesByEmployee.set(employeeId, current);
+    } catch {
+      // A corrupt enrollment must not prevent other employees from checking in.
+    }
+  });
+
+  return [...templatesByEmployee.values()];
 };
 
 export const saveFaceRegistration = async payload => {
