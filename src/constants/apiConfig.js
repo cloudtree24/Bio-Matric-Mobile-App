@@ -9,8 +9,7 @@
  * ------------------------------------------------------------------ */
 
 // Anshuman Local
-// const BASE_URL = 'http://192.168.29.3:91/api';
-const BASE_URL = 'http://192.168.29.2:91/api';
+const BASE_URL = 'http://192.168.29.3:91';
 
 // Datari Local
 // const BASE_URL = 'http://192.168.29.71/api';

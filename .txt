@@ -10,3 +10,6 @@ Face-related code: deletion se pehle decision chahiye
 - [FaceCheckIn.js](/Volumes/Seagate/hems/src/components/FaceCheckIn.js) active screen se import nahi hota. Ye [FaceApiService.js](/Volumes/Seagate/hems/src/services/FaceApiService.js) use karta hai, jo tests mein bhi hai.
 - [biometricApi.js](/Volumes/Seagate/hems/src/services/biometricApi.js) aur [biometricPayload.js](/Volumes/Seagate/hems/src/utils/biometricPayload.js) active flow mein use nahi hote, lekin unke tests hain.
 - [secureStorage.js](/Volumes/Seagate/hems/src/services/secureStorage.js) ka active import nahi mila. react-native-keychain dependency
+
+cd android
+./gradlew :app:assembleDebug --no-daemon
