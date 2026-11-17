@@ -22,7 +22,6 @@ import { ROUTES } from '../../constants/routes';
 import { useAdminSession } from '../../context/AdminSessionContext';
 import {
   fetchEmployeeDetails,
-  getFilteredEmployees,
 } from '../../services/employeeRegistrationApi';
 
 const RegisterScreen = ({ navigation }) => {
@@ -32,23 +31,17 @@ const RegisterScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const requestVersion = useRef(0);
-  const [suggestionEmployees, setSuggestionEmployees] = useState([]);
   const [history, setHistory] = useState([]);
   const [historyReady, setHistoryReady] = useState(false);
   const [historyError, setHistoryError] = useState('');
-  const [suggestionsError, setSuggestionsError] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const historyWrites = useRef(Promise.resolve());
   const historyKey = `@hems/employee-search-history/${companyId}`;
 
   useEffect(() => {
     let active = true;
-    setSuggestionEmployees([]);
     setHistory([]);
     setHistoryReady(false);
     setHistoryError('');
-    setSuggestionsError('');
-    setShowSuggestions(false);
     if (!companyId) return;
     historyWrites.current
       .then(() => AsyncStorage.getItem(historyKey))
@@ -67,34 +60,10 @@ const RegisterScreen = ({ navigation }) => {
       .finally(() => {
         if (active) setHistoryReady(true);
       });
-    getFilteredEmployees(companyId, 0, 0, 0, 0)
-      .then(items => {
-        if (active)
-          setSuggestionEmployees(items.filter(item => item?.employeeId));
-      })
-      .catch(() => {
-        if (active)
-          setSuggestionsError(
-            'Suggestions unavailable. You can still search by employee ID.',
-          );
-      });
     return () => {
       active = false;
     };
   }, [companyId, historyKey]);
-
-  const query = employeeId.trim().toLowerCase();
-  const suggestions = query
-    ? suggestionEmployees
-        .filter(
-          item =>
-            String(item.employeeId).toLowerCase().includes(query) ||
-            String(item.employeeName || '')
-              .toLowerCase()
-              .includes(query),
-        )
-        .slice(0, 6)
-    : [];
 
   useEffect(() => {
     setEmployeeId('');
@@ -108,7 +77,6 @@ const RegisterScreen = ({ navigation }) => {
   }, [companyId]);
 
   const changeEmployeeId = value => {
-    setShowSuggestions(true);
     requestVersion.current += 1;
     setEmployeeId(value);
     setEmployee(null);
@@ -116,8 +84,8 @@ const RegisterScreen = ({ navigation }) => {
     setLoading(false);
   };
 
-  const searchEmployee = async (selectedInput = employeeId) => {
-    if (!companyId || isSessionLoading || loading || !historyReady) return;
+  const loadEmployeeDetails = async (selectedInput = employeeId) => {
+    if (!companyId || isSessionLoading || loading) return;
     const input = selectedInput.trim();
     setEmployee(null);
     if (!input) {
@@ -125,7 +93,6 @@ const RegisterScreen = ({ navigation }) => {
       return;
     }
     setEmployeeId(input);
-    setShowSuggestions(false);
     const nextHistory = [
       input,
       ...history.filter(item => item !== input),
@@ -226,44 +193,18 @@ const RegisterScreen = ({ navigation }) => {
             autoCapitalize="none"
             autoCorrect={false}
             returnKeyType="search"
-            onSubmitEditing={() => searchEmployee()}
-            onFocus={() => setShowSuggestions(true)}
+            onSubmitEditing={() => loadEmployeeDetails()}
             style={styles.input}
           />
-          {showSuggestions && suggestions.length > 0 && (
-            <View style={styles.suggestions}>
-              <Text style={styles.label}>Matching employees</Text>
-              {suggestions.map(item => (
-                <Pressable
-                  key={String(item.id ?? item.employeeId)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select employee ${item.employeeId}`}
-                  disabled={loading || !historyReady}
-                  onPress={() => searchEmployee(String(item.employeeId))}
-                  style={styles.suggestion}
-                >
-                  <Text style={styles.value}>
-                    {item.employeeId} - {item.employeeName || '—'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-          {!!suggestionsError && (
-            <Text style={styles.value}>{suggestionsError}</Text>
-          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Search employee"
-            disabled={
-              !companyId || isSessionLoading || loading || !historyReady
-            }
-            onPress={() => searchEmployee()}
+            disabled={!companyId || isSessionLoading || loading}
+            onPress={() => loadEmployeeDetails()}
             style={[
               styles.button,
               styles.searchButton,
-              (!companyId || isSessionLoading || loading || !historyReady) &&
-                styles.disabled,
+              (!companyId || isSessionLoading || loading) && styles.disabled,
             ]}
           >
             {loading ? (
@@ -287,7 +228,7 @@ const RegisterScreen = ({ navigation }) => {
                   accessibilityRole="button"
                   accessibilityLabel={`Search employee ${item}`}
                   disabled={loading || !historyReady}
-                  onPress={() => searchEmployee(item)}
+                  onPress={() => loadEmployeeDetails(item)}
                   style={styles.suggestion}
                 >
                   <Text style={styles.value}>{item}</Text>

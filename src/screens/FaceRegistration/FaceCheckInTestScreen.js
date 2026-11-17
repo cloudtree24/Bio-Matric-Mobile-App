@@ -24,8 +24,7 @@ import {ROUTES} from '../../constants/routes';
 const FaceCheckInTestScreen = ({ navigation }) => {
   const { companyId, isSessionLoading } = useAdminSession();
   const focused = useIsFocused();
-  const { cameraPermissionStatus, requestCameraPermission } =
-    useCameraPermission();
+  const { cameraPermissionStatus, requestCameraPermission } = useCameraPermission();
   const [preparing, setPreparing] = useState(false);
   const [ready, setReady] = useState(false);
   const [modal, setModal] = useState(null);
@@ -217,6 +216,8 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     if (modal?.retryAttendance) controller.current?.retry();
     else startVerification();
   };
+
+
   return (
     <SafeAreaView style={styles.root}>
       {ready ? (
@@ -285,6 +286,9 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F6FBF8' },
   form: { padding: 24, paddingTop: 56 },
@@ -301,3 +305,4 @@ const styles = StyleSheet.create({
   back: { alignItems: 'center', padding: 16 },
 });
 export default FaceCheckInTestScreen;
+

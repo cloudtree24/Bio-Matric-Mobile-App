@@ -23,11 +23,11 @@ test('accepts list responses and rejects unexpected server responses', async () 
   await expect(getBranches(1)).rejects.toThrow('Unexpected response');
 });
 
-test('looks up an entered employee ID and preserves empty results', async () => {
+test('fetches employee details using the company and entered employee ID', async () => {
   const employee = {id: 15, employeeId: 'EMP15', employeeName: 'Test Employee'};
   apiClient.get.mockResolvedValueOnce({data: [employee]}).mockResolvedValueOnce({data: []});
-  await expect(fetchEmployeeDetails(1, 15)).resolves.toEqual([employee]);
-  expect(apiClient.get).toHaveBeenLastCalledWith('/EmpRegistration/FetchEmployeeDetails/1/15');
+  await expect(fetchEmployeeDetails(1, 'AA_12')).resolves.toEqual([employee]);
+  expect(apiClient.get).toHaveBeenLastCalledWith('/EmpRegistration/FetchEmployeeDetails/1/AA_12');
   await expect(fetchEmployeeDetails(1, 'unknown/id')).resolves.toEqual([]);
   expect(apiClient.get).toHaveBeenLastCalledWith('/EmpRegistration/FetchEmployeeDetails/1/unknown%2Fid');
 });
