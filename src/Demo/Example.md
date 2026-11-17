@@ -46,7 +46,7 @@ Risks found from the repository:
 
 ### 3. API inventory
 
-Base API URL is configured in [apiConfig.js](/Users/rajsubudhi/Desktop/ESSMobileApp/src/constants/apiConfig.js): `https://hcmapiv2.anantatek.com/api`. `axiosInstance` sends JSON, has a 30-second default timeout, and conditionally adds Bearer/UserId headers.
+Base API URL is configured through `API_BASE_URL` in `.env`. `axiosInstance` sends JSON, has a 30-second default timeout, and conditionally adds Bearer/UserId headers.
 
 The application does not define backend response schemas. Each API response below is therefore the actual client handling: generally `response.data`, an array, or an `isSuccess/message` envelope.
 
