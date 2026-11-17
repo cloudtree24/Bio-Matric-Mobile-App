@@ -4,7 +4,7 @@ jest.mock('../src/services/apiClient', () => ({
 }));
 
 import apiClient from '../src/services/apiClient';
-import {enableFaceAttendance, getCompanyFaceTemplates, getFaceAccess, saveFaceRegistration} from '../src/services/biometricApi';
+import {enableFaceAttendance, getCompanyFaceTemplates, getCompanyPhoneNumbers, getFaceAccess, getFaceTemplatesByPhone, saveFaceRegistration} from '../src/services/biometricApi';
 import {float32ToBase64} from '../src/utils/base64';
 
 describe('biometric API client', () => {
@@ -61,15 +61,38 @@ describe('backend biometric retrieval', () => {
 test('loads, validates, decodes, and groups company face templates once', async () => {
   const embedding = float32ToBase64(Float32Array.from({length: 128}, (_, index) => index === 0 ? 1 : 0));
   apiClient.get.mockResolvedValue({data: [
-    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', faceEmbeding: embedding, companyId: 1},
-    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', phoneNumber: '918951456256', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', phoneNumber: '918951456256', faceEmbeding: embedding, companyId: 1},
     {employeeId: 14, faceEmbeding: embedding, companyId: 2},
     {employeeId: 15, faceEmbeding: 'invalid', companyId: 1},
     {employeeId: 16, faceEmbeding: embedding, companyId: 1, isDelete: 1},
   ]});
 
   await expect(getCompanyFaceTemplates(1)).resolves.toEqual([
-    expect.objectContaining({employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', companyId: 1, faces: [expect.objectContaining({embedding: expect.any(Float32Array)}), expect.objectContaining({embedding: expect.any(Float32Array)})]}),
+    expect.objectContaining({employeeId: 13, employeeCode: 'AA_14', employeeName: 'Jamila Gonzales', phoneNumber: '918951456256', companyId: 1, faces: [expect.objectContaining({embedding: expect.any(Float32Array)}), expect.objectContaining({embedding: expect.any(Float32Array)})]}),
   ]);
   expect(apiClient.get).toHaveBeenLastCalledWith('/EmployeeBiomatricRegister/GetAllEmployeeBiomatricDetails/1');
+});
+
+test('returns only the registered face templates for the entered phone number', async () => {
+  const embedding = float32ToBase64(Float32Array.from({length: 128}, (_, index) => index === 0 ? 1 : 0));
+  apiClient.get.mockResolvedValue({data: [
+    {employeeId: 13, phoneNumber: '+91 89514 56256', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 14, phoneNumber: '919999999999', faceEmbeding: embedding, companyId: 1},
+  ]});
+
+  await expect(getFaceTemplatesByPhone(1, '8951456256')).resolves.toEqual([
+    expect.objectContaining({employeeId: 13}),
+  ]);
+});
+
+test('returns unique local phone numbers for registered company faces', async () => {
+  const embedding = float32ToBase64(Float32Array.from({length: 128}, (_, index) => index === 0 ? 1 : 0));
+  apiClient.get.mockResolvedValue({data: [
+    {employeeId: 13, phoneNumber: '918951456256', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 14, phoneNumber: '+91 89514 56256', faceEmbeding: embedding, companyId: 1},
+    {employeeId: 15, phoneNumber: '919999999999', faceEmbeding: embedding, companyId: 1},
+  ]});
+
+  await expect(getCompanyPhoneNumbers(1)).resolves.toEqual(['8951456256', '9999999999']);
 });

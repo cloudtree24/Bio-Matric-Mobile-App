@@ -55,6 +55,15 @@ const isInactiveBiometric = record =>
   record?.isActive === false || Number(record?.isActive) === 0 ||
   String(record?.status || '').toLowerCase() === 'inactive';
 
+// Backend records may contain an Indian phone number with (+91/91) or without
+// the country code. The check-in field captures the local 10-digit number.
+const normalizePhoneNumber = value => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 12 && digits.startsWith('91')
+    ? digits.slice(2)
+    : digits;
+};
+
 // Templates are decoded once at load time and grouped so a person with more
 // than one enrolled template can never occupy multiple ranking positions.
 export const getCompanyFaceTemplates = async companyId => {
@@ -75,6 +84,7 @@ export const getCompanyFaceTemplates = async companyId => {
         employeeId,
         employeeCode: record.employeeCode || null,
         employeeName: record.employeeName || null,
+        phoneNumber: record.phoneNumber || null,
         companyId: company,
         faces: [],
       };
@@ -86,6 +96,31 @@ export const getCompanyFaceTemplates = async companyId => {
   });
 
   return [...templatesByEmployee.values()];
+};
+
+// The backend exposes company biometric records as a list. Restrict the
+// verification candidates to the employee identified by the entered phone.
+export const getFaceTemplatesByPhone = async (companyId, phoneNumber) => {
+  const normalizedPhone = normalizePhoneNumber(phoneNumber);
+  if (!normalizedPhone) throw new Error('Enter a valid phone number.');
+
+  const templates = await getCompanyFaceTemplates(companyId);
+  const matches = templates.filter(
+    template => normalizePhoneNumber(template.phoneNumber) === normalizedPhone,
+  );
+  if (matches.length > 1) {
+    throw new Error('This phone number is linked to multiple employee records. Contact your administrator.');
+  }
+  return matches;
+};
+
+export const getCompanyPhoneNumbers = async companyId => {
+  const templates = await getCompanyFaceTemplates(companyId);
+  return [...new Set(
+    templates
+      .map(template => normalizePhoneNumber(template.phoneNumber))
+      .filter(phoneNumber => phoneNumber.length === 10),
+  )];
 };
 
 export const saveFaceRegistration = async payload => {

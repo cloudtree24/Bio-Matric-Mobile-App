@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -14,7 +15,10 @@ import FaceStatusModal from '../../components/FaceStatusModal';
 import { useAdminSession } from '../../context/AdminSessionContext';
 import { useCameraPermission } from '../../hooks/useCameraPermission';
 import faceRecognitionService from '../../services/faceRecognitionService';
-import { getCompanyFaceTemplates } from '../../services/biometricApi';
+import {
+  getCompanyPhoneNumbers,
+  getFaceTemplatesByPhone,
+} from '../../services/biometricApi';
 import { requireBackendId } from '../../utils/backendIdentity';
 import { matchEmployeeFace } from '../../services/faceMatchingService';
 import { createFaceCheckInController } from '../../services/faceCheckInService';
@@ -28,6 +32,8 @@ const FaceCheckInTestScreen = ({ navigation }) => {
   const [preparing, setPreparing] = useState(false);
   const [ready, setReady] = useState(false);
   const [modal, setModal] = useState(null);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumbers, setPhoneNumbers] = useState([]);
   const [scanSession, setScanSession] = useState(0);
   const employeeTemplates = useRef([]);
   const controller = useRef(null);
@@ -59,8 +65,43 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     };
   }, [companyId, focused]);
 
+  useEffect(() => {
+    let activeRequest = true;
+    setPhoneNumbers([]);
+    if (!companyId || isSessionLoading) return undefined;
+    getCompanyPhoneNumbers(companyId)
+      .then(numbers => {
+        if (activeRequest) setPhoneNumbers(numbers);
+      })
+      .catch(() => {
+        // Suggestions are optional; verification still reports server errors.
+      });
+    return () => {
+      activeRequest = false;
+    };
+  }, [companyId, isSessionLoading]);
+
+  const phoneSuggestions = phoneNumber
+    ? phoneNumbers.filter(number => number.startsWith(phoneNumber)).slice(0, 5)
+    : [];
+
   const startVerification = useCallback(async () => {
     if (preparingRef.current || !active.current || isSessionLoading) return;
+    const enteredPhoneNumber = phoneNumber.trim();
+    if (!enteredPhoneNumber) {
+      setModal({
+        title: 'Phone number required',
+        message: 'Enter your registered phone number before face verification.',
+      });
+      return;
+    }
+    if (enteredPhoneNumber.length !== 10) {
+      setModal({
+        title: 'Invalid phone number',
+        message: 'Enter the 10-digit mobile number after +91.',
+      });
+      return;
+    }
     preparingRef.current = true;
     const version = ++generation.current;
     const current = () => active.current && version === generation.current;
@@ -74,13 +115,16 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     try {
       requireBackendId(companyId, 'Company ID');
       const biometricCompanyId = Number(companyId);
-      const templates = await getCompanyFaceTemplates(biometricCompanyId);
+      const templates = await getFaceTemplatesByPhone(
+        biometricCompanyId,
+        enteredPhoneNumber,
+      );
       if (!current()) return;
       if (!templates.length) {
         setModal({
-          title: 'No registered faces',
+          title: 'No registered face found',
           message:
-            'No active face registrations are available for this company. Ask your administrator for help.',
+            'No active face registration matches this phone number. Check the number or ask your administrator for help.',
         });
         return;
       }
@@ -113,6 +157,7 @@ const FaceCheckInTestScreen = ({ navigation }) => {
     cameraPermissionStatus,
     companyId,
     isSessionLoading,
+    phoneNumber,
     requestCameraPermission,
   ]);
 
@@ -239,9 +284,43 @@ const FaceCheckInTestScreen = ({ navigation }) => {
         <View style={styles.form}>
           <Text style={styles.title}>Face Check-In</Text>
           <Text style={styles.description}>
-            Verify your face against your company’s registered employee records
-            before saving check-in.
+            Enter your registered phone number, then verify your face before
+            saving check-in.
           </Text>
+          <Text style={styles.label}>Phone number</Text>
+          <View style={styles.phoneField}>
+            <View accessible accessibilityLabel="Country code +91" style={styles.countryCode}>
+              <Text style={styles.countryCodeText}>+91</Text>
+            </View>
+            <TextInput
+              accessibilityLabel="Phone number"
+              placeholder="Enter 10-digit number"
+              placeholderTextColor="#89978F"
+              value={phoneNumber}
+              onChangeText={value => setPhoneNumber(value.replace(/\D/g, '').slice(0, 10))}
+              editable={!preparing && !isSessionLoading}
+              keyboardType="phone-pad"
+              autoCorrect={false}
+              maxLength={10}
+              style={styles.phoneInput}
+            />
+          </View>
+          {phoneSuggestions.length > 0 && (
+            <View style={styles.suggestions}>
+              <Text style={styles.suggestionsLabel}>Matching contact numbers</Text>
+              {phoneSuggestions.map(number => (
+                <Pressable
+                  key={number}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use phone number ${number}`}
+                  onPress={() => setPhoneNumber(number)}
+                  style={styles.suggestion}
+                >
+                  <Text style={styles.suggestionText}>+91 {number}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <Pressable
             accessibilityRole="button"
             disabled={preparing || isSessionLoading || !companyId}
@@ -294,6 +373,51 @@ const styles = StyleSheet.create({
   form: { padding: 24, paddingTop: 56 },
   title: { fontSize: 28, color: '#153C2D', fontWeight: '800' },
   description: { color: '#476452', lineHeight: 22, marginVertical: 16 },
+  label: {color: '#344D40', fontSize: 13, fontWeight: '700', marginBottom: 8},
+  phoneField: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D6E3DA',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 12,
+  },
+  countryCode: {
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#D6E3DA',
+    backgroundColor: '#F4F8F5',
+    borderTopLeftRadius: 7,
+    borderBottomLeftRadius: 7,
+  },
+  countryCodeText: {color: '#153C2D', fontWeight: '700'},
+  phoneInput: {
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    color: '#153C2D',
+  },
+  suggestions: {
+    marginTop: -4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#DFEEE5',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  suggestionsLabel: {
+    color: '#476452',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  suggestion: {paddingHorizontal: 12, paddingVertical: 11},
+  suggestionText: {color: '#153C2D'},
   button: {
     minHeight: 48,
     alignItems: 'center',

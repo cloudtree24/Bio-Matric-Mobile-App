@@ -1,7 +1,7 @@
 import React from 'react';
 import TestRenderer, {act} from 'react-test-renderer';
 import FaceCheckInTestScreen from '../src/screens/FaceRegistration/FaceCheckInTestScreen';
-import {getCompanyFaceTemplates} from '../src/services/biometricApi';
+import {getCompanyPhoneNumbers, getFaceTemplatesByPhone} from '../src/services/biometricApi';
 import {matchEmployeeFace} from '../src/services/faceMatchingService';
 import {saveAttendance} from '../src/services/attendanceApi';
 
@@ -10,7 +10,10 @@ jest.mock('../src/context/AdminSessionContext', () => ({useAdminSession: () => (
 jest.mock('../src/components/FaceCamera', () => 'FaceCamera');
 jest.mock('../src/hooks/useCameraPermission', () => ({useCameraPermission: () => ({cameraPermissionStatus: 'granted', requestCameraPermission: jest.fn()})}));
 jest.mock('../src/services/faceRecognitionService', () => ({__esModule: true, default: {loadModel: jest.fn().mockResolvedValue({})}}));
-jest.mock('../src/services/biometricApi', () => ({getCompanyFaceTemplates: jest.fn()}));
+jest.mock('../src/services/biometricApi', () => ({
+  getCompanyPhoneNumbers: jest.fn(),
+  getFaceTemplatesByPhone: jest.fn(),
+}));
 jest.mock('../src/services/faceMatchingService', () => ({matchEmployeeFace: jest.fn()}));
 jest.mock('../src/services/attendanceApi', () => ({buildAttendancePayload: employeeId => ({EmployeeId: employeeId}), saveAttendance: jest.fn()}));
 
@@ -19,19 +22,21 @@ const button = label => renderer.root.findAll(node => node.props.accessibilityRo
 const templates = [{employeeId: 10, employeeCode: 'AA_11', employeeName: 'Employee One', companyId: 1, faces: [{embedding: new Float32Array([1, 0])}]}];
 beforeEach(() => {
   jest.clearAllMocks();
-  getCompanyFaceTemplates.mockResolvedValue(templates);
+  getCompanyPhoneNumbers.mockResolvedValue(['8951456256']);
+  getFaceTemplatesByPhone.mockResolvedValue(templates);
   saveAttendance.mockResolvedValue({isSuccess: true});
   matchEmployeeFace.mockReturnValue({matched: true, employeeId: 10, companyId: 1, employeeName: 'Employee One', score: 0.95, scoreGap: 0.3});
 });
 afterEach(async () => { if (renderer) await act(async () => renderer.unmount()); renderer = null; });
 const start = async () => {
   await act(async () => { renderer = TestRenderer.create(<FaceCheckInTestScreen navigation={{goBack: jest.fn()}} />); });
+  await act(async () => renderer.root.findByProps({accessibilityLabel: 'Phone number'}).props.onChangeText('8951456256'));
   await act(async () => button('Start verification').props.onPress());
 };
 
-test('loads company templates once and checks in the identified employee', async () => {
+test('loads phone-matched templates once and checks in the identified employee', async () => {
   await start();
-  expect(getCompanyFaceTemplates).toHaveBeenCalledWith(1);
+  expect(getFaceTemplatesByPhone).toHaveBeenCalledWith(1, '8951456256');
   const camera = renderer.root.findByType('FaceCamera');
   await act(async () => { await camera.props.onComplete(new Float32Array([1, 0])); });
   expect(matchEmployeeFace).toHaveBeenCalledWith(expect.any(Float32Array), templates);
@@ -41,10 +46,20 @@ test('loads company templates once and checks in the identified employee', async
 });
 
 test('keeps the camera closed when the company has no valid templates', async () => {
-  getCompanyFaceTemplates.mockResolvedValue([]);
+  getFaceTemplatesByPhone.mockResolvedValue([]);
   await start();
   expect(renderer.root.findAllByType('FaceCamera')).toHaveLength(0);
-  expect(JSON.stringify(renderer.toJSON())).toContain('No registered faces');
+  expect(JSON.stringify(renderer.toJSON())).toContain('No registered face found');
+});
+
+test('shows matching contact numbers and fills the phone input when selected', async () => {
+  getCompanyPhoneNumbers.mockResolvedValue(['8951456256', '8765432109']);
+  await act(async () => { renderer = TestRenderer.create(<FaceCheckInTestScreen navigation={{goBack: jest.fn()}} />); });
+  const input = renderer.root.findByProps({accessibilityLabel: 'Phone number'});
+  await act(async () => input.props.onChangeText('87'));
+  expect(JSON.stringify(renderer.toJSON())).toContain('Matching contact numbers');
+  await act(async () => renderer.root.findByProps({accessibilityLabel: 'Use phone number 8765432109'}).props.onPress());
+  expect(renderer.root.findByProps({accessibilityLabel: 'Phone number'}).props.value).toBe('8765432109');
 });
 
 test('rejects ambiguous matches without saving attendance', async () => {
