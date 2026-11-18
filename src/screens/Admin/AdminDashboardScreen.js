@@ -12,16 +12,19 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import CheckInCard from '../../components/CheckInCard';
 import AppHeader from '../../components/AppHeader';
+import ResponsiveTabView from '../../components/ResponsiveTabView';
 import {ROUTES} from '../../constants/routes';
 import {useAdminSession} from '../../context/AdminSessionContext';
 import {findNearestGeofence} from '../../utils/nearestGeofence';
 import {getCurrentDeviceLocation} from '../../services/deviceLocation';
 
-const DashboardContent = ({navigation, location, onFetchLocation, isFetchingLocation}) => (
-  <SafeAreaView style={styles.safeArea}>
-    <AppHeader showNavigation />
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-     
+const dashboardRoutes = [
+  {key: 'overview', title: 'Overview'},
+  {key: 'tools', title: 'Employee tools'},
+];
+
+const OverviewTab = ({location, onFetchLocation, isFetchingLocation}) => (
+  <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.welcomeCopy}>
           <Text style={styles.eyebrow}>ADMIN DASHBOARD</Text>
           <Text accessibilityRole="header" style={styles.title}>Hello, Admin</Text>
@@ -48,20 +51,6 @@ const DashboardContent = ({navigation, location, onFetchLocation, isFetchingLoca
       </View>
 
       <View style={styles.sectionHeading}>
-        <Text accessibilityRole="header" style={styles.sectionTitle}>Quick actions</Text>
-        <Text style={styles.sectionHint}>Get started</Text>
-      </View>
-      <CheckInCard faceOnly accessibilityLabel="Face Check In" onPress={() => navigation.navigate(ROUTES.FACE_CHECK_IN_TEST)} />
-      <Pressable accessibilityRole="button" accessibilityLabel="Register" onPress={() => navigation.navigate(ROUTES.REGISTER)} style={({pressed}) => [styles.employeeCard, pressed && styles.pressed]}>
-        <View style={styles.employeeIcon}><Icon name="people-outline" size={23} color="#07583C" /></View>
-        <View style={styles.rowCopy}>
-          <Text style={styles.actionTitle}>Employees</Text>
-          <Text style={styles.actionHint}>View and register employee faces</Text>
-        </View>
-        <Icon name="chevron-forward" size={20} color="#638273" />
-      </Pressable>
-
-      <View style={styles.sectionHeading}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>Notice board</Text>
       </View>
       <View style={styles.noticeCard}>
@@ -74,7 +63,45 @@ const DashboardContent = ({navigation, location, onFetchLocation, isFetchingLoca
         </View>
         <Text style={styles.noticeCopy}>Only admins can register employee faces.</Text>
       </View>
-    </ScrollView>
+  </ScrollView>
+);
+
+const EmployeeToolsTab = ({navigation}) => (
+  <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={styles.sectionHeading}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>Quick actions</Text>
+      <Text style={styles.sectionHint}>Get started</Text>
+    </View>
+    <CheckInCard faceOnly accessibilityLabel="Face Check In" onPress={() => navigation.navigate(ROUTES.FACE_CHECK_IN_TEST)} />
+    <Pressable accessibilityRole="button" accessibilityLabel="Register" onPress={() => navigation.navigate(ROUTES.REGISTER)} style={({pressed}) => [styles.employeeCard, pressed && styles.pressed]}>
+      <View style={styles.employeeIcon}><Icon name="people-outline" size={23} color="#07583C" /></View>
+      <View style={styles.rowCopy}>
+        <Text style={styles.actionTitle}>Employees</Text>
+        <Text style={styles.actionHint}>View and register employee faces</Text>
+      </View>
+      <Icon name="chevron-forward" size={20} color="#638273" />
+    </Pressable>
+  </ScrollView>
+);
+
+const DashboardContent = ({navigation, location, onFetchLocation, isFetchingLocation}) => (
+  <SafeAreaView style={styles.safeArea}>
+    <AppHeader showNavigation />
+    <ResponsiveTabView
+      routes={dashboardRoutes}
+      lazy
+      renderScene={({route}) =>
+        route.key === 'overview' ? (
+          <OverviewTab
+            location={location}
+            onFetchLocation={onFetchLocation}
+            isFetchingLocation={isFetchingLocation}
+          />
+        ) : (
+          <EmployeeToolsTab navigation={navigation} />
+        )
+      }
+    />
   </SafeAreaView>
 );
 
