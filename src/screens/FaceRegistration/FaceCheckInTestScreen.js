@@ -34,6 +34,7 @@ const FaceCheckInTestScreen = ({ navigation }) => {
   const [modal, setModal] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneNumbers, setPhoneNumbers] = useState([]);
+  const [suggestionStatus, setSuggestionStatus] = useState('idle');
   const [scanSession, setScanSession] = useState(0);
   const employeeTemplates = useRef([]);
   const controller = useRef(null);
@@ -68,13 +69,21 @@ const FaceCheckInTestScreen = ({ navigation }) => {
   useEffect(() => {
     let activeRequest = true;
     setPhoneNumbers([]);
-    if (!companyId || isSessionLoading) return undefined;
+    if (!companyId || isSessionLoading) {
+      setSuggestionStatus('idle');
+      return undefined;
+    }
+    setSuggestionStatus('loading');
     getCompanyPhoneNumbers(companyId)
       .then(numbers => {
-        if (activeRequest) setPhoneNumbers(numbers);
+        if (activeRequest) {
+          setPhoneNumbers(numbers);
+          setSuggestionStatus('ready');
+        }
       })
       .catch(() => {
-        // Suggestions are optional; verification still reports server errors.
+        // Suggestions are optional, so allow manual verification to continue.
+        if (activeRequest) setSuggestionStatus('error');
       });
     return () => {
       activeRequest = false;
@@ -321,6 +330,20 @@ const FaceCheckInTestScreen = ({ navigation }) => {
               ))}
             </View>
           )}
+          {phoneNumber.length > 0 && suggestionStatus === 'loading' && (
+            <Text style={styles.suggestionStatus}>Loading registered numbers…</Text>
+          )}
+          {phoneNumber.length > 0 && suggestionStatus === 'ready' &&
+            phoneSuggestions.length === 0 && (
+              <Text style={styles.suggestionStatus}>
+                No registered number starts with these digits. You can still enter the full number manually.
+              </Text>
+            )}
+          {phoneNumber.length > 0 && suggestionStatus === 'error' && (
+            <Text style={styles.suggestionStatus}>
+              Registered number suggestions could not be loaded. Enter the full number manually.
+            </Text>
+          )}
           <Pressable
             accessibilityRole="button"
             disabled={preparing || isSessionLoading || !companyId}
@@ -418,6 +441,7 @@ const styles = StyleSheet.create({
   },
   suggestion: {paddingHorizontal: 12, paddingVertical: 11},
   suggestionText: {color: '#153C2D'},
+  suggestionStatus: {color: '#476452', fontSize: 12, lineHeight: 18, marginBottom: 12},
   button: {
     minHeight: 48,
     alignItems: 'center',

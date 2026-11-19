@@ -1,12 +1,20 @@
 import axios from 'axios';
+import Config from 'react-native-config';
 
 import {getApiBaseUrl} from '../config/apiConfig';
 
 const API_TIMEOUT_MS = 30000;
-let accessToken = null;
+// This app uses the server's shared API credential. Keep the value in .env;
+// putting it directly in JavaScript both exposes it and can break parsing.
+let accessToken = String(Config.API_BEARER_TOKEN || '').trim() || null;
+let apiUserId = String(Config.API_USER_ID || '').trim() || null;
 
 export const setApiAccessToken = token => {
-  accessToken = token || null;
+  accessToken = String(token || '').trim() || null;
+};
+
+export const setApiUserId = userId => {
+  apiUserId = String(userId || '').trim() || null;
 };
 
 const apiClient = axios.create({
@@ -20,6 +28,10 @@ apiClient.interceptors.request.use(config => {
 
   if (accessToken) {
     nextConfig.headers = {...nextConfig.headers, Authorization: `Bearer ${accessToken}`};
+  }
+
+  if (apiUserId) {
+    nextConfig.headers = {...nextConfig.headers, UserId: apiUserId};
   }
 
   return nextConfig;
